@@ -39,7 +39,7 @@ Die Datenbank liegt im Volume `owndata-data` unter `/data/owndata.db`.
 
 Vercel hat kein persistentes Dateisystem und keinen Dauerprozess. Deshalb liegt die Datenbank bei [Turso](https://turso.tech) (libSQL, gleicher SQL-Dialekt wie SQLite, Gratis-Plan reicht) und der Worker wird per Cron über `/api/worker/run` angestossen.
 
-**1. Turso-Datenbank anlegen** (Turso CLI oder Web-Dashboard):
+**1. Turso-Datenbank anlegen.** Am einfachsten direkt beim Import auf Vercel unter „Optional Integrations“ → Turso → Add: Die Integration legt die Datenbank an und setzt `TURSO_DATABASE_URL` und `TURSO_AUTH_TOKEN` automatisch (die App akzeptiert diese Namen). Alternativ manuell mit der Turso CLI:
 
 ```bash
 turso db create owndata
@@ -55,8 +55,8 @@ turso db tokens create owndata       # → Auth-Token
 | --- | --- |
 | `APP_SECRET` | `openssl rand -hex 32` |
 | `APP_URL` | `https://<projekt>.vercel.app` |
-| `DATABASE_URL` | `libsql://owndata-<name>.turso.io` |
-| `DATABASE_AUTH_TOKEN` | Token aus Schritt 1 |
+| `DATABASE_URL` | `libsql://owndata-<name>.turso.io` (entfällt mit der Turso-Integration) |
+| `DATABASE_AUTH_TOKEN` | Token aus Schritt 1 (entfällt mit der Turso-Integration) |
 | `CRON_SECRET` | `openssl rand -hex 32` (Vercel Cron authentifiziert sich damit) |
 | `WORKER_TOKEN` | optional, für externe Cron-Dienste |
 | `ALLOW_REGISTRATION` | `false` |

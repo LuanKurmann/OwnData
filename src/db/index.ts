@@ -17,15 +17,21 @@ const g = globalThis as unknown as { __owndataDb?: Promise<Db> };
  *  - default: ./data/owndata.db
  */
 export function databaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  // TURSO_* are what the Turso integration on the Vercel Marketplace injects.
+  const url = process.env.DATABASE_URL || process.env.TURSO_DATABASE_URL;
+  if (url) return url;
   return `file:${process.env.DATABASE_PATH ?? "./data/owndata.db"}`;
+}
+
+export function databaseAuthToken(): string | undefined {
+  return process.env.DATABASE_AUTH_TOKEN || process.env.TURSO_AUTH_TOKEN || undefined;
 }
 
 async function init(): Promise<Db> {
   const url = databaseUrl();
   const isFile = url.startsWith("file:");
   if (isFile) mkdirSync(dirname(url.slice(5)), { recursive: true });
-  const client = createClient({ url, authToken: process.env.DATABASE_AUTH_TOKEN || undefined });
+  const client = createClient({ url, authToken: databaseAuthToken() });
   if (isFile) {
     await client.execute("PRAGMA journal_mode = WAL");
     await client.execute("PRAGMA foreign_keys = ON");

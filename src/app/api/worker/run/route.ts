@@ -21,8 +21,15 @@ function authorizedByToken(req: Request): boolean {
  *  - Logged-in user: POST runs the worker for their own account only
  */
 export async function GET(req: Request) {
-  if (!authorizedByToken(req)) return new Response("Unauthorized", { status: 401 });
-  return Response.json(await runWorker());
+  if (authorizedByToken(req)) return Response.json(await runWorker());
+  // Zero-config fallback: with no secret configured, Vercel Cron may still trigger a run,
+  // but the response carries no details.
+  const noSecrets = !process.env.WORKER_TOKEN && !process.env.CRON_SECRET;
+  if (noSecrets && (req.headers.get("user-agent") ?? "").startsWith("vercel-cron/")) {
+    await runWorker();
+    return Response.json({ ok: true });
+  }
+  return new Response("Unauthorized", { status: 401 });
 }
 
 export async function POST(req: Request) {

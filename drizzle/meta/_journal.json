@@ -8,6 +8,13 @@
       "when": 1792167674582,
       "tag": "0000_unique_shatterstar",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1792176483732,
+      "tag": "0001_omniscient_starjammers",
+      "breakpoints": true
     }
   ]
 }

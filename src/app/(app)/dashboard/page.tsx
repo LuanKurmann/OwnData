@@ -64,7 +64,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .all();
 
   const setup = [
-    { done: !!profile.fullName && !!profile.addresses, label: t("setupProfile"), href: "/profile" },
+    { done: !!profile.lastName && profile.addressList.length > 0, label: t("setupProfile"), href: "/profile" },
     { done: !!mail, label: t("setupMail"), href: "/settings/mail" },
     { done: all.length > 0, label: t("setupFirst"), href: "/brokers" },
   ];

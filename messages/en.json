@@ -1,5 +1,8 @@
 {
-  "app": { "name": "OwnData", "tagline": "Your data. Your removal requests." },
+  "app": {
+    "name": "OwnData",
+    "tagline": "Your data. Your removal requests."
+  },
   "nav": {
     "dashboard": "Dashboard",
     "brokers": "Data brokers",
@@ -209,16 +212,34 @@
   "profile": {
     "title": "My profile",
     "intro": "These details are inserted into requests so recipients can find your records. Provide only what is necessary.",
-    "fullName": "Full name",
     "aliases": "Other name variants (one per line)",
     "birthDate": "Date of birth",
-    "addresses": "Addresses, current and previous (one per line)",
+    "addresses": "Addresses",
     "emails": "E-mail addresses (one per line)",
     "phones": "Phone numbers (one per line)",
-    "country": "Country of residence (ISO code)",
+    "country": "Country",
     "signature": "Signature name",
-    "account": "Account",
-    "uiLanguage": "Interface language"
+    "uiLanguage": "Interface language",
+    "person": "Person",
+    "firstName": "First name",
+    "middleName": "Middle name",
+    "lastName": "Last name",
+    "aliasesHint": "Former names, spelling variants, maiden name. One per line.",
+    "addressesHint": "Your current address and previous addresses that data brokers may have on file.",
+    "legacyAddresses": "These addresses come from the old free-text field. Please re-enter them below in structured form so they are used in requests.",
+    "addrKind": "Type",
+    "addrCurrent": "Current",
+    "addrPrevious": "Previous",
+    "addrFrom": "From (year)",
+    "addrTo": "To (year)",
+    "street": "Street",
+    "houseNumber": "No.",
+    "addressLine2": "Line 2 (c/o, apartment)",
+    "postalCode": "Postal code",
+    "city": "City",
+    "region": "State / province",
+    "addAddress": "Add address",
+    "newAddress": "New address"
   },
   "mail": {
     "title": "Mail account",

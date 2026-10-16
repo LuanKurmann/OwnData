@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq, isNull, or, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import type { Broker, Profile, Template, RequestType, Jurisdiction } from "@/db/schema";
+import type { Broker, ProfileWithAddresses, Template, RequestType, Jurisdiction } from "@/db/schema";
 import { newReference } from "@/lib/reference";
 import { buildVars, render } from "@/lib/template-render";
 
@@ -32,13 +32,19 @@ export function escalationKey(j: Jurisdiction, lang: "de" | "en") {
   return `escalation_gdpr_${lang}`;
 }
 
-export async function getProfile(userId: number): Promise<Profile> {
+export async function getProfile(userId: number): Promise<ProfileWithAddresses> {
   const db = await getDb();
   let p = await db.select().from(schema.profiles).where(eq(schema.profiles.userId, userId)).get();
   if (!p) {
     p = await db.insert(schema.profiles).values({ userId }).returning().get();
   }
-  return p;
+  const addressList = await db
+    .select()
+    .from(schema.addresses)
+    .where(eq(schema.addresses.userId, userId))
+    .orderBy(schema.addresses.kind, schema.addresses.sortOrder, schema.addresses.id)
+    .all();
+  return { ...p, addressList };
 }
 
 export async function getMailAccount(userId: number) {

@@ -18,7 +18,7 @@ export async function createRequestsAction(formData: FormData) {
   const sendNow = String(formData.get("mode")) === "send";
   if (ids.length === 0) redirectFlash("/brokers", "invalid", "err");
   const profile = await getProfile(user.id);
-  if (!profile.fullName) redirectFlash("/profile", "noProfile", "err");
+  if (!profile.lastName && !profile.fullName) redirectFlash("/profile", "noProfile", "err");
   if (mode === "queue" && !(await getMailAccount(user.id))) redirectFlash("/settings/mail", "noMail", "err");
   const res = await createRequests({ userId: user.id, brokerIds: ids, type, queue: mode === "queue" });
   if (sendNow && res.created.length) await runWorker(user.id);

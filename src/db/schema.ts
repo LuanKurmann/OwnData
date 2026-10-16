@@ -51,16 +51,46 @@ export const users = sqliteTable("users", {
 export const profiles = sqliteTable("profiles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  firstName: text("first_name").notNull().default(""),
+  middleName: text("middle_name").notNull().default(""),
+  lastName: text("last_name").notNull().default(""),
+  /** derived: first + middle + last; kept for templates and display */
   fullName: text("full_name").notNull().default(""),
   aliases: text("aliases").notNull().default(""), // newline separated
-  birthDate: text("birth_date").notNull().default(""), // ISO date or free text
-  addresses: text("addresses").notNull().default(""), // newline separated (current + previous)
+  birthDate: text("birth_date").notNull().default(""), // ISO date (YYYY-MM-DD)
+  /** legacy free-text addresses; structured addresses live in the `addresses` table */
+  addresses: text("addresses").notNull().default(""),
   emails: text("emails").notNull().default(""), // newline separated
   phones: text("phones").notNull().default(""), // newline separated
   country: text("country").notNull().default("CH"),
   signature: text("signature").notNull().default(""),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(now),
 });
+
+export const ADDRESS_KINDS = ["current", "previous"] as const;
+export type AddressKind = (typeof ADDRESS_KINDS)[number];
+
+/** Structured postal addresses of a user (current and previous ones). */
+export const addresses = sqliteTable(
+  "addresses",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ADDRESS_KINDS }).notNull().default("current"),
+    street: text("street").notNull().default(""),
+    houseNumber: text("house_number").notNull().default(""),
+    addressLine2: text("address_line2").notNull().default(""), // c/o, apartment, floor
+    postalCode: text("postal_code").notNull().default(""),
+    city: text("city").notNull().default(""),
+    region: text("region").notNull().default(""), // canton / state / province
+    country: text("country").notNull().default("CH"), // ISO 3166-1 alpha-2
+    fromYear: text("from_year").notNull().default(""),
+    toYear: text("to_year").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
+  },
+  (t) => [index("addresses_user_idx").on(t.userId)],
+);
 
 export const mailAccounts = sqliteTable("mail_accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -200,6 +230,8 @@ export const activityLog = sqliteTable(
 
 export type User = typeof users.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
+export type Address = typeof addresses.$inferSelect;
+export type ProfileWithAddresses = Profile & { addressList: Address[] };
 export type MailAccount = typeof mailAccounts.$inferSelect;
 export type Broker = typeof brokers.$inferSelect;
 export type Template = typeof templates.$inferSelect;

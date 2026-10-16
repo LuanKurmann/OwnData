@@ -1,5 +1,8 @@
 {
-  "app": { "name": "OwnData", "tagline": "Deine Daten. Deine Löschanfragen." },
+  "app": {
+    "name": "OwnData",
+    "tagline": "Deine Daten. Deine Löschanfragen."
+  },
   "nav": {
     "dashboard": "Übersicht",
     "brokers": "Datenbroker",
@@ -209,16 +212,34 @@
   "profile": {
     "title": "Mein Profil",
     "intro": "Diese Angaben werden in die Anfragen eingesetzt, damit die Empfänger deine Datensätze finden. Gib nur an, was nötig ist.",
-    "fullName": "Vollständiger Name",
     "aliases": "Weitere Namensvarianten (eine pro Zeile)",
     "birthDate": "Geburtsdatum",
-    "addresses": "Adressen, aktuell und frühere (eine pro Zeile)",
+    "addresses": "Adressen",
     "emails": "E-Mail-Adressen (eine pro Zeile)",
     "phones": "Telefonnummern (eine pro Zeile)",
-    "country": "Wohnsitzland (ISO-Code)",
+    "country": "Land",
     "signature": "Unterschrift / Grussformel-Name",
-    "account": "Konto",
-    "uiLanguage": "Sprache der Oberfläche"
+    "uiLanguage": "Sprache der Oberfläche",
+    "person": "Person",
+    "firstName": "Vorname",
+    "middleName": "Zweiter Vorname",
+    "lastName": "Nachname",
+    "aliasesHint": "Frühere Namen, Schreibvarianten, Mädchenname. Eine pro Zeile.",
+    "addressesHint": "Aktuelle Adresse und frühere Adressen, an denen Datenbroker dich gespeichert haben könnten.",
+    "legacyAddresses": "Diese Adressen stammen aus dem alten Freitextfeld. Bitte unten strukturiert neu erfassen, dann werden sie in Anfragen verwendet.",
+    "addrKind": "Art",
+    "addrCurrent": "Aktuell",
+    "addrPrevious": "Früher",
+    "addrFrom": "Von (Jahr)",
+    "addrTo": "Bis (Jahr)",
+    "street": "Strasse",
+    "houseNumber": "Nr.",
+    "addressLine2": "Zusatz (c/o, Wohnung)",
+    "postalCode": "PLZ",
+    "city": "Ort",
+    "region": "Kanton / Bundesland",
+    "addAddress": "Adresse hinzufügen",
+    "newAddress": "Neue Adresse"
   },
   "mail": {
     "title": "E-Mail-Konto",

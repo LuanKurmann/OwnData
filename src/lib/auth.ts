@@ -44,7 +44,10 @@ export async function registerUser(input: { email: string; password: string; nam
     .values({ email, passwordHash, name: input.name.trim(), role: isFirst ? "admin" : "user", locale: input.locale })
     .returning()
     .get();
-  await db.insert(schema.profiles).values({ userId: user.id, fullName: user.name, emails: email }).run();
+  const parts = user.name.split(/\s+/).filter(Boolean);
+  const lastName = parts.length > 1 ? parts.pop()! : "";
+  const firstName = parts.join(" ");
+  await db.insert(schema.profiles).values({ userId: user.id, firstName, lastName, fullName: user.name, emails: email }).run();
   await setSessionCookie(user);
   return { user };
 }

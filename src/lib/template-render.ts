@@ -1,4 +1,5 @@
-import type { Broker, Profile, Request } from "@/db/schema";
+import type { Broker, ProfileWithAddresses, Request } from "@/db/schema";
+import { composeFullName, countryName, describeAddress } from "./address";
 import { format } from "date-fns";
 import { LEGAL } from "./legal";
 
@@ -18,7 +19,7 @@ function bullets(s: string, lang: "de" | "en", empty: string): string {
 }
 
 export function buildVars(opts: {
-  profile: Profile;
+  profile: ProfileWithAddresses;
   broker: Broker;
   reference: string;
   lang: "de" | "en";
@@ -35,15 +36,24 @@ export function buildVars(opts: {
   const days = LEGAL[opts.jurisdiction].deadlineDays[opts.requestType];
   const now = new Date();
   const deadline = opts.deadlineAt ?? new Date(now.getTime() + days * 86400000);
+  const fullName = composeFullName(profile.firstName, profile.middleName, profile.lastName) || profile.fullName || "—";
+  const current = profile.addressList.find((a) => a.kind === "current");
+  const structured = profile.addressList.map((a) => describeAddress(a, lang)).join("\n");
+  const addressText = structured || profile.addresses;
+  const residence = current?.country || profile.country;
   return {
-    fullName: profile.fullName || "—",
+    fullName,
+    firstName: profile.firstName,
+    middleName: profile.middleName,
+    lastName: profile.lastName,
     aliases: bullets(profile.aliases, lang, none),
     birthDate: profile.birthDate || (lang === "de" ? "(keine Angabe)" : "(not provided)"),
-    addresses: bullets(profile.addresses, lang, none),
+    addresses: bullets(addressText, lang, none),
+    currentAddress: current ? describeAddress(current, lang) : lang === "de" ? "(keine Angabe)" : "(not provided)",
     emails: bullets(profile.emails || opts.senderEmail, lang, none),
     phones: bullets(profile.phones, lang, none),
-    country: profile.country,
-    signature: profile.signature || profile.fullName,
+    country: countryName(residence, lang) || residence,
+    signature: profile.signature || fullName,
     brokerName: broker.name,
     brokerWebsite: broker.website,
     dataUrls: bullets(opts.dataUrls ?? broker.dataUrls, lang, none),
@@ -62,7 +72,7 @@ export function render(text: string, vars: TemplateVars): string {
   return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => (k in vars ? vars[k] : `{{${k}}}`));
 }
 
-export function varsFromRequest(req: Request, broker: Broker, profile: Profile, senderEmail: string): TemplateVars {
+export function varsFromRequest(req: Request, broker: Broker, profile: ProfileWithAddresses, senderEmail: string): TemplateVars {
   return buildVars({
     profile,
     broker,
@@ -78,9 +88,13 @@ export function varsFromRequest(req: Request, broker: Broker, profile: Profile, 
 
 export const PLACEHOLDERS = [
   "fullName",
+  "firstName",
+  "middleName",
+  "lastName",
   "aliases",
   "birthDate",
   "addresses",
+  "currentAddress",
   "emails",
   "phones",
   "country",

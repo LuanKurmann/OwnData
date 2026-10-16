@@ -2,14 +2,31 @@ import { runWorker } from "@/server/worker";
 import { getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
-/** Trigger a worker run. Either an authenticated user (own account only) or the WORKER_TOKEN header (all users). */
-export async function POST(req: Request) {
-  const token = process.env.WORKER_TOKEN;
+function authorizedByToken(req: Request): boolean {
+  const workerToken = process.env.WORKER_TOKEN;
+  const cronSecret = process.env.CRON_SECRET;
   const header = req.headers.get("x-worker-token");
-  if (token && header && header === token) {
-    return Response.json(await runWorker());
-  }
+  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (workerToken && (header === workerToken || bearer === workerToken)) return true;
+  if (cronSecret && bearer === cronSecret) return true;
+  return false;
+}
+
+/**
+ * Trigger a worker run for all users.
+ *  - Vercel Cron: GET with `Authorization: Bearer <CRON_SECRET>` (set CRON_SECRET in the project env)
+ *  - External cron (cron-job.org, curl): GET/POST with header `x-worker-token: <WORKER_TOKEN>`
+ *  - Logged-in user: POST runs the worker for their own account only
+ */
+export async function GET(req: Request) {
+  if (!authorizedByToken(req)) return new Response("Unauthorized", { status: 401 });
+  return Response.json(await runWorker());
+}
+
+export async function POST(req: Request) {
+  if (authorizedByToken(req)) return Response.json(await runWorker());
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
   return Response.json(await runWorker(user.id));

@@ -1,7 +1,8 @@
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
+  // On Vercel (serverless) there is no long-running process: the worker is triggered by cron via /api/worker/run.
+  if (process.env.NEXT_RUNTIME === "nodejs" && !process.env.VERCEL) {
     const { getDb } = await import("@/db");
-    getDb(); // run migrations + seed at boot
+    await getDb(); // run migrations + seed at boot
     const { startScheduler } = await import("@/server/worker");
     startScheduler();
   }

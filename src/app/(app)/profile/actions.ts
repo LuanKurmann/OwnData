@@ -26,13 +26,13 @@ export async function saveProfileAction(formData: FormData) {
   const parsed = schemaZ.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirectFlash("/profile", "invalid", "err");
   const { locale, name, ...profile } = parsed.data;
-  const db = getDb();
-  getProfile(user.id);
-  db.update(schema.profiles)
+  const db = await getDb();
+  await getProfile(user.id);
+  await db.update(schema.profiles)
     .set({ ...profile, updatedAt: new Date() })
     .where(eq(schema.profiles.userId, user.id))
     .run();
-  db.update(schema.users).set({ locale, name }).where(eq(schema.users.id, user.id)).run();
+  await db.update(schema.users).set({ locale, name }).where(eq(schema.users.id, user.id)).run();
   const store = await cookies();
   store.set("locale", locale, { path: "/", maxAge: 365 * 24 * 3600, sameSite: "lax" });
   revalidatePath("/", "layout");

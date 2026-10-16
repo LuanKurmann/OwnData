@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const t = await getTranslations("auth");
   const ta = await getTranslations("app");
-  const open = registrationOpen();
+  const open = await registrationOpen();
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-sm">

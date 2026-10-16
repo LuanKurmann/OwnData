@@ -15,7 +15,7 @@ export async function setLocaleAction(formData: FormData) {
   const store = await cookies();
   store.set("locale", locale, { path: "/", maxAge: 365 * 24 * 3600, sameSite: "lax" });
   const user = await getCurrentUser();
-  if (user) getDb().update(schema.users).set({ locale: locale as Locale }).where(eq(schema.users.id, user.id)).run();
+  if (user) await (await getDb()).update(schema.users).set({ locale: locale as Locale }).where(eq(schema.users.id, user.id)).run();
   revalidatePath("/", "layout");
 }
 

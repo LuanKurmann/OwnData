@@ -13,6 +13,7 @@ import BrokerTable, { type BrokerRow } from "./BrokerTable";
 import { createRequestsAction } from "./actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 export default async function BrokersPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -25,12 +26,12 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
   const j = str(sp.j);
   const c = str(sp.c);
 
-  const db = getDb();
+  const db = await getDb();
   const lastByBroker = new Map<number, NonNullable<BrokerRow["last"]>>();
-  for (const r of db.select().from(schema.requests).where(eq(schema.requests.userId, user.id)).orderBy(desc(schema.requests.createdAt)).all()) {
+  for (const r of await db.select().from(schema.requests).where(eq(schema.requests.userId, user.id)).orderBy(desc(schema.requests.createdAt)).all()) {
     if (!lastByBroker.has(r.brokerId)) lastByBroker.set(r.brokerId, { status: r.status, type: r.type });
   }
-  const rows: BrokerRow[] = visibleBrokers(user.id)
+  const rows: BrokerRow[] = (await visibleBrokers(user.id))
     .filter((b) => !q || b.name.toLowerCase().includes(q) || b.website.toLowerCase().includes(q) || b.privacyEmail.includes(q))
     .filter((b) => !j || b.jurisdiction === j)
     .filter((b) => !c || b.category === c)

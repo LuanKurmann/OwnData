@@ -13,8 +13,8 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const t = await getTranslations("auth");
   const locale = await getLocale();
-  const open = registrationOpen();
-  const first = userCount() === 0;
+  const open = await registrationOpen();
+  const first = (await userCount()) === 0;
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-sm">

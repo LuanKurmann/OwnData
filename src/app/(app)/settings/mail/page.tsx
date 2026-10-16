@@ -9,11 +9,12 @@ import { saveMailAction, testImapAction, testSmtpAction } from "./actions";
 import { runWorkerAction } from "../../actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 export default async function MailSettingsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const user = await requireUser();
-  const acc = getMailAccount(user.id);
+  const acc = await getMailAccount(user.id);
   const t = await getTranslations("mail");
   const tc = await getTranslations("common");
   const locale = await getLocale();

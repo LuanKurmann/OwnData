@@ -12,8 +12,8 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!token) return null;
   const session = await verifySessionToken(token);
   if (!session) return null;
-  const db = getDb();
-  return db.select().from(schema.users).where(eq(schema.users.id, session.uid)).get() ?? null;
+  const db = await getDb();
+  return await db.select().from(schema.users).where(eq(schema.users.id, session.uid)).get() ?? null;
 }
 
 export async function requireUser(): Promise<User> {
@@ -22,36 +22,36 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
-export function userCount(): number {
-  const db = getDb();
-  return db.select({ n: sql<number>`count(*)` }).from(schema.users).get()?.n ?? 0;
+export async function userCount(): Promise<number> {
+  const db = await getDb();
+  return (await db.select({ n: sql<number>`count(*)` }).from(schema.users).get())?.n ?? 0;
 }
 
-export function registrationOpen(): boolean {
-  if (userCount() === 0) return true;
+export async function registrationOpen(): Promise<boolean> {
+  if ((await userCount()) === 0) return true;
   return (process.env.ALLOW_REGISTRATION ?? "false").toLowerCase() === "true";
 }
 
 export async function registerUser(input: { email: string; password: string; name: string; locale: "de" | "en" }) {
-  const db = getDb();
+  const db = await getDb();
   const email = input.email.trim().toLowerCase();
-  const existing = db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email)).get();
+  const existing = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, email)).get();
   if (existing) return { error: "emailTaken" as const };
-  const isFirst = userCount() === 0;
+  const isFirst = (await userCount()) === 0;
   const passwordHash = await bcrypt.hash(input.password, 12);
-  const user = db
+  const user = await db
     .insert(schema.users)
     .values({ email, passwordHash, name: input.name.trim(), role: isFirst ? "admin" : "user", locale: input.locale })
     .returning()
     .get();
-  db.insert(schema.profiles).values({ userId: user.id, fullName: user.name, emails: email }).run();
+  await db.insert(schema.profiles).values({ userId: user.id, fullName: user.name, emails: email }).run();
   await setSessionCookie(user);
   return { user };
 }
 
 export async function loginUser(email: string, password: string) {
-  const db = getDb();
-  const user = db.select().from(schema.users).where(eq(schema.users.email, email.trim().toLowerCase())).get();
+  const db = await getDb();
+  const user = await db.select().from(schema.users).where(eq(schema.users.email, email.trim().toLowerCase())).get();
   if (!user) return { error: "invalidCredentials" as const };
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return { error: "invalidCredentials" as const };

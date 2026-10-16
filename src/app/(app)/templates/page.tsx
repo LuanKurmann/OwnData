@@ -14,8 +14,8 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
   const user = await requireUser();
   const t = await getTranslations("templates");
   const tt = await getTranslations("type");
-  const db = getDb();
-  const all = db
+  const db = await getDb();
+  const all = await db
     .select()
     .from(schema.templates)
     .where(or(isNull(schema.templates.userId), eq(schema.templates.userId, user.id)))

@@ -4,7 +4,6 @@ ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
 FROM base AS deps
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -18,7 +17,7 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ENV DATABASE_PATH=/data/owndata.db
+ENV DATABASE_URL=file:/data/owndata.db
 RUN groupadd -r app && useradd -r -g app -d /app app && mkdir -p /data && chown app:app /data
 COPY --from=build --chown=app:app /app/public ./public
 COPY --from=build --chown=app:app /app/.next/standalone ./

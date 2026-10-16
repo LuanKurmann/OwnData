@@ -13,13 +13,14 @@ import BrokerForm from "../BrokerForm";
 import { copyBrokerAction, deleteBrokerAction } from "../actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 export default async function BrokerDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SearchParams> }) {
   const { id } = await params;
   const sp = await searchParams;
   const user = await requireUser();
-  const db = getDb();
-  const b = db
+  const db = await getDb();
+  const b = await db
     .select()
     .from(schema.brokers)
     .where(and(eq(schema.brokers.id, Number(id)), or(isNull(schema.brokers.userId), eq(schema.brokers.userId, user.id))))
@@ -31,7 +32,7 @@ export default async function BrokerDetailPage({ params, searchParams }: { param
   const tt = await getTranslations("type");
   const tc = await getTranslations("common");
   const locale = await getLocale();
-  const reqs = db
+  const reqs = await db
     .select()
     .from(schema.requests)
     .where(and(eq(schema.requests.brokerId, b.id), eq(schema.requests.userId, user.id)))

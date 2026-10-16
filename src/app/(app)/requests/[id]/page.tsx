@@ -16,24 +16,25 @@ import CopyButton from "@/components/CopyButton";
 import { deleteRequestAction, queueAction, reminderAction, saveNotesAction, setStatusAction, updateDraftAction } from "../actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 export default async function RequestDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<SearchParams> }) {
   const { id } = await params;
   const sp = await searchParams;
   const user = await requireUser();
-  const db = getDb();
-  const req = db.select().from(schema.requests).where(and(eq(schema.requests.id, Number(id)), eq(schema.requests.userId, user.id))).get();
+  const db = await getDb();
+  const req = await db.select().from(schema.requests).where(and(eq(schema.requests.id, Number(id)), eq(schema.requests.userId, user.id))).get();
   if (!req) notFound();
-  const broker = db.select().from(schema.brokers).where(eq(schema.brokers.id, req.brokerId)).get();
+  const broker = await db.select().from(schema.brokers).where(eq(schema.brokers.id, req.brokerId)).get();
   if (!broker) notFound();
-  const msgs = db.select().from(schema.messages).where(eq(schema.messages.requestId, req.id)).orderBy(asc(schema.messages.occurredAt)).all();
+  const msgs = await db.select().from(schema.messages).where(eq(schema.messages.requestId, req.id)).orderBy(asc(schema.messages.occurredAt)).all();
   const t = await getTranslations("requests");
   const tt = await getTranslations("type");
   const tc = await getTranslations("common");
   const ts = await getTranslations("status");
   const locale = await getLocale();
-  const profile = getProfile(user.id);
-  const acc = getMailAccount(user.id);
+  const profile = await getProfile(user.id);
+  const acc = await getMailAccount(user.id);
 
   const editable = ["draft", "failed", "queued"].includes(req.status);
   const canRemind = ["sent", "acknowledged", "overdue", "reminded", "needs_info", "escalation_ready"].includes(req.status) && !!acc;
@@ -43,7 +44,7 @@ export default async function RequestDetailPage({ params, searchParams }: { para
 
   let escalationText: { subject: string; body: string } | null = null;
   if (showEscalation) {
-    const tpl = resolveTemplate(user.id, escalationKey(req.jurisdiction, req.language));
+    const tpl = await resolveTemplate(user.id, escalationKey(req.jurisdiction, req.language));
     if (tpl) {
       const vars = varsFromRequest(req, broker, profile, acc?.fromEmail ?? profile.emails.split(/\r?\n/)[0] ?? "");
       escalationText = { subject: render(tpl.subject, vars), body: render(tpl.body, vars) };

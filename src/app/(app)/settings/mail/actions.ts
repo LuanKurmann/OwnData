@@ -34,8 +34,8 @@ export async function saveMailAction(formData: FormData) {
   const parsed = mailSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirectFlash(PATH, "invalid", "err");
   const d = parsed.data;
-  const db = getDb();
-  const existing = getMailAccount(user.id);
+  const db = await getDb();
+  const existing = await getMailAccount(user.id);
   if (!existing && !d.smtpPass) redirectFlash(PATH, "invalid", "err");
   const values = {
     fromName: d.fromName,
@@ -56,12 +56,12 @@ export async function saveMailAction(formData: FormData) {
   };
   if (existing) {
     const hostChanged = existing.imapHost !== d.imapHost || existing.imapMailbox !== (d.imapMailbox || "INBOX");
-    db.update(schema.mailAccounts)
+    await db.update(schema.mailAccounts)
       .set({ ...values, ...(hostChanged ? { imapLastUid: 0 } : {}) })
       .where(eq(schema.mailAccounts.id, existing.id))
       .run();
   } else {
-    db.insert(schema.mailAccounts).values({ userId: user.id, ...values }).run();
+    await db.insert(schema.mailAccounts).values({ userId: user.id, ...values }).run();
   }
   revalidatePath(PATH);
   redirectFlash(PATH, "saved");
@@ -69,14 +69,14 @@ export async function saveMailAction(formData: FormData) {
 
 export async function testSmtpAction() {
   const user = await requireUser();
-  const acc = getMailAccount(user.id);
+  const acc = await getMailAccount(user.id);
   if (!acc) redirectFlash(PATH, "noMail", "err");
   try {
     await verifySmtp(acc);
-    getDb().update(schema.mailAccounts).set({ smtpLastError: null }).where(eq(schema.mailAccounts.id, acc.id)).run();
+    await (await getDb()).update(schema.mailAccounts).set({ smtpLastError: null }).where(eq(schema.mailAccounts.id, acc.id)).run();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    getDb().update(schema.mailAccounts).set({ smtpLastError: msg }).where(eq(schema.mailAccounts.id, acc.id)).run();
+    await (await getDb()).update(schema.mailAccounts).set({ smtpLastError: msg }).where(eq(schema.mailAccounts.id, acc.id)).run();
     redirectFlash(PATH, "smtpFail", "err", { error: msg.slice(0, 200) });
   }
   redirectFlash(PATH, "smtpOk");
@@ -84,14 +84,14 @@ export async function testSmtpAction() {
 
 export async function testImapAction() {
   const user = await requireUser();
-  const acc = getMailAccount(user.id);
+  const acc = await getMailAccount(user.id);
   if (!acc) redirectFlash(PATH, "noMail", "err");
   try {
     await verifyImap(acc);
-    getDb().update(schema.mailAccounts).set({ imapLastError: null }).where(eq(schema.mailAccounts.id, acc.id)).run();
+    await (await getDb()).update(schema.mailAccounts).set({ imapLastError: null }).where(eq(schema.mailAccounts.id, acc.id)).run();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    getDb().update(schema.mailAccounts).set({ imapLastError: msg }).where(eq(schema.mailAccounts.id, acc.id)).run();
+    await (await getDb()).update(schema.mailAccounts).set({ imapLastError: msg }).where(eq(schema.mailAccounts.id, acc.id)).run();
     redirectFlash(PATH, "imapFail", "err", { error: msg.slice(0, 200) });
   }
   redirectFlash(PATH, "imapOk");

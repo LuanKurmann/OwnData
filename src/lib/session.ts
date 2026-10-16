@@ -1,5 +1,6 @@
 // Edge-safe session helpers (no Node-only imports) so middleware can use them.
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT } from "jose/jwt/sign";
+import { jwtVerify } from "jose/jwt/verify";
 
 export const SESSION_COOKIE = "od_session";
 const SESSION_DAYS = 30;

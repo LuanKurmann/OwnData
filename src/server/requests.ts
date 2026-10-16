@@ -6,9 +6,9 @@ import { newReference } from "@/lib/reference";
 import { buildVars, render } from "@/lib/template-render";
 
 /** Resolve a template: user override first, then system template. */
-export function resolveTemplate(userId: number, key: string): Template | null {
-  const db = getDb();
-  const rows = db
+export async function resolveTemplate(userId: number, key: string): Promise<Template | null> {
+  const db = await getDb();
+  const rows = await db
     .select()
     .from(schema.templates)
     .where(and(eq(schema.templates.key, key), or(eq(schema.templates.userId, userId), isNull(schema.templates.userId))))
@@ -32,23 +32,23 @@ export function escalationKey(j: Jurisdiction, lang: "de" | "en") {
   return `escalation_gdpr_${lang}`;
 }
 
-export function getProfile(userId: number): Profile {
-  const db = getDb();
-  let p = db.select().from(schema.profiles).where(eq(schema.profiles.userId, userId)).get();
+export async function getProfile(userId: number): Promise<Profile> {
+  const db = await getDb();
+  let p = await db.select().from(schema.profiles).where(eq(schema.profiles.userId, userId)).get();
   if (!p) {
-    p = db.insert(schema.profiles).values({ userId }).returning().get();
+    p = await db.insert(schema.profiles).values({ userId }).returning().get();
   }
   return p;
 }
 
-export function getMailAccount(userId: number) {
-  const db = getDb();
-  return db.select().from(schema.mailAccounts).where(eq(schema.mailAccounts.userId, userId)).get() ?? null;
+export async function getMailAccount(userId: number) {
+  const db = await getDb();
+  return await db.select().from(schema.mailAccounts).where(eq(schema.mailAccounts.userId, userId)).get() ?? null;
 }
 
-export function visibleBrokers(userId: number): Broker[] {
-  const db = getDb();
-  return db
+export async function visibleBrokers(userId: number): Promise<Broker[]> {
+  const db = await getDb();
+  return await db
     .select()
     .from(schema.brokers)
     .where(or(isNull(schema.brokers.userId), eq(schema.brokers.userId, userId)))
@@ -65,12 +65,12 @@ export type CreateRequestInput = {
   toEmailOverride?: string;
 };
 
-export function createRequests(input: CreateRequestInput): { created: number[]; skipped: { brokerId: number; reason: string }[] } {
-  const db = getDb();
-  const profile = getProfile(input.userId);
-  const account = getMailAccount(input.userId);
+export async function createRequests(input: CreateRequestInput): Promise<{ created: number[]; skipped: { brokerId: number; reason: string }[] }> {
+  const db = await getDb();
+  const profile = await getProfile(input.userId);
+  const account = await getMailAccount(input.userId);
   const senderEmail = account?.fromEmail ?? profile.emails.split(/\r?\n/)[0] ?? "";
-  const brokersList = db
+  const brokersList = await db
     .select()
     .from(schema.brokers)
     .where(and(inArray(schema.brokers.id, input.brokerIds), or(isNull(schema.brokers.userId), eq(schema.brokers.userId, input.userId))))
@@ -86,7 +86,7 @@ export function createRequests(input: CreateRequestInput): { created: number[]; 
       continue;
     }
     const lang = input.language ?? broker.language;
-    const tpl = resolveTemplate(input.userId, templateKey(broker.jurisdiction, input.type, lang));
+    const tpl = await resolveTemplate(input.userId, templateKey(broker.jurisdiction, input.type, lang));
     if (!tpl) {
       skipped.push({ brokerId: broker.id, reason: "noTemplate" });
       continue;
@@ -101,7 +101,7 @@ export function createRequests(input: CreateRequestInput): { created: number[]; 
       jurisdiction: broker.jurisdiction,
       senderEmail,
     });
-    const row = db
+    const row = await db
       .insert(schema.requests)
       .values({
         userId: input.userId,
@@ -118,7 +118,7 @@ export function createRequests(input: CreateRequestInput): { created: number[]; 
       .returning({ id: schema.requests.id })
       .get();
     created.push(row.id);
-    db.insert(schema.activityLog)
+    await db.insert(schema.activityLog)
       .values({ userId: input.userId, requestId: row.id, event: input.queue ? "request.queued" : "request.drafted", detail: broker.name })
       .run();
   }

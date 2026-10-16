@@ -25,8 +25,8 @@ export type WorkerReport = {
 
 const g = globalThis as unknown as { __owndataWorkerRunning?: boolean };
 
-function log(userId: number | null, requestId: number | null, event: string, detail = "", level: "info" | "warn" | "error" = "info") {
-  getDb().insert(schema.activityLog).values({ userId, requestId, event, detail, level }).run();
+async function log(userId: number | null, requestId: number | null, event: string, detail = "", level: "info" | "warn" | "error" = "info") {
+  await (await getDb()).insert(schema.activityLog).values({ userId, requestId, event, detail, level }).run();
 }
 
 function addDays(d: Date, days: number) {
@@ -53,8 +53,8 @@ export async function runWorker(onlyUserId?: number): Promise<WorkerReport> {
   }
   g.__owndataWorkerRunning = true;
   try {
-    const db = getDb();
-    const accounts = db
+    const db = await getDb();
+    const accounts = await db
       .select()
       .from(schema.mailAccounts)
       .where(onlyUserId ? eq(schema.mailAccounts.userId, onlyUserId) : undefined)
@@ -62,15 +62,15 @@ export async function runWorker(onlyUserId?: number): Promise<WorkerReport> {
 
     for (const acc of accounts) {
       await sendQueued(acc, report);
-      markDeadlines(acc.userId, report);
+      await markDeadlines(acc.userId, report);
       await sendReminders(acc, report);
       if (acc.imapEnabled && acc.imapHost) await pollInbox(acc, report);
     }
     // users without mail account still get deadline bookkeeping
     if (!onlyUserId) {
       const withAcc = new Set(accounts.map((a) => a.userId));
-      for (const u of db.select({ id: schema.users.id }).from(schema.users).all()) {
-        if (!withAcc.has(u.id)) markDeadlines(u.id, report);
+      for (const u of await db.select({ id: schema.users.id }).from(schema.users).all()) {
+        if (!withAcc.has(u.id)) await markDeadlines(u.id, report);
       }
     }
   } catch (e) {
@@ -83,8 +83,8 @@ export async function runWorker(onlyUserId?: number): Promise<WorkerReport> {
 }
 
 async function sendQueued(acc: MailAccount, report: WorkerReport) {
-  const db = getDb();
-  const queued = db
+  const db = await getDb();
+  const queued = await db
     .select()
     .from(schema.requests)
     .where(and(eq(schema.requests.userId, acc.userId), eq(schema.requests.status, "queued")))
@@ -94,11 +94,11 @@ async function sendQueued(acc: MailAccount, report: WorkerReport) {
       const { messageId } = await sendMail(acc, { to: req.toEmail, subject: req.subject, text: req.body });
       const now = new Date();
       const days = LEGAL[req.jurisdiction].deadlineDays[req.type];
-      db.update(schema.requests)
+      await db.update(schema.requests)
         .set({ status: "sent", sentAt: now, deadlineAt: addDays(now, days), lastError: null, updatedAt: now })
         .where(eq(schema.requests.id, req.id))
         .run();
-      db.insert(schema.messages)
+      await db.insert(schema.messages)
         .values({
           requestId: req.id,
           direction: "out",
@@ -111,28 +111,28 @@ async function sendQueued(acc: MailAccount, report: WorkerReport) {
           occurredAt: now,
         })
         .run();
-      log(acc.userId, req.id, "request.sent", `${req.toEmail} (${messageId})`);
+      await log(acc.userId, req.id, "request.sent", `${req.toEmail} (${messageId})`);
       report.sent++;
-      db.update(schema.mailAccounts).set({ smtpLastError: null }).where(eq(schema.mailAccounts.id, acc.id)).run();
+      await db.update(schema.mailAccounts).set({ smtpLastError: null }).where(eq(schema.mailAccounts.id, acc.id)).run();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      db.update(schema.requests)
+      await db.update(schema.requests)
         .set({ status: "failed", lastError: msg, updatedAt: new Date() })
         .where(eq(schema.requests.id, req.id))
         .run();
-      db.update(schema.mailAccounts).set({ smtpLastError: msg }).where(eq(schema.mailAccounts.id, acc.id)).run();
-      log(acc.userId, req.id, "request.failed", msg, "error");
+      await db.update(schema.mailAccounts).set({ smtpLastError: msg }).where(eq(schema.mailAccounts.id, acc.id)).run();
+      await log(acc.userId, req.id, "request.failed", msg, "error");
       report.failed++;
       report.errors.push(`send ${req.reference}: ${msg}`);
     }
   }
 }
 
-function markDeadlines(userId: number, report: WorkerReport) {
-  const db = getDb();
+async function markDeadlines(userId: number, report: WorkerReport) {
+  const db = await getDb();
   const now = new Date();
   // sent/acknowledged past deadline -> overdue
-  const overdue = db
+  const overdue = await db
     .select()
     .from(schema.requests)
     .where(
@@ -145,12 +145,12 @@ function markDeadlines(userId: number, report: WorkerReport) {
     )
     .all();
   for (const r of overdue) {
-    db.update(schema.requests).set({ status: "overdue", updatedAt: now }).where(eq(schema.requests.id, r.id)).run();
-    log(userId, r.id, "request.overdue", r.reference, "warn");
+    await db.update(schema.requests).set({ status: "overdue", updatedAt: now }).where(eq(schema.requests.id, r.id)).run();
+    await log(userId, r.id, "request.overdue", r.reference, "warn");
     report.overdueMarked++;
   }
   // reminded past escalation deadline -> escalation_ready
-  const esc = db
+  const esc = await db
     .select()
     .from(schema.requests)
     .where(
@@ -163,23 +163,23 @@ function markDeadlines(userId: number, report: WorkerReport) {
     )
     .all();
   for (const r of esc) {
-    db.update(schema.requests).set({ status: "escalation_ready", updatedAt: now }).where(eq(schema.requests.id, r.id)).run();
-    log(userId, r.id, "request.escalation_ready", r.reference, "warn");
+    await db.update(schema.requests).set({ status: "escalation_ready", updatedAt: now }).where(eq(schema.requests.id, r.id)).run();
+    await log(userId, r.id, "request.escalation_ready", r.reference, "warn");
     report.escalationReady++;
   }
 }
 
 export async function sendReminderFor(acc: MailAccount, req: Request): Promise<void> {
-  const db = getDb();
-  const broker = db.select().from(schema.brokers).where(eq(schema.brokers.id, req.brokerId)).get();
+  const db = await getDb();
+  const broker = await db.select().from(schema.brokers).where(eq(schema.brokers.id, req.brokerId)).get();
   if (!broker) throw new Error("broker missing");
-  const tpl = resolveTemplate(acc.userId, reminderKey(req.language));
+  const tpl = await resolveTemplate(acc.userId, reminderKey(req.language));
   if (!tpl) throw new Error("reminder template missing");
-  const profile = getProfile(acc.userId);
+  const profile = await getProfile(acc.userId);
   const vars = varsFromRequest(req, broker, profile, acc.fromEmail);
   const subject = render(tpl.subject, vars);
   const body = render(tpl.body, vars);
-  const original = db
+  const original = await db
     .select()
     .from(schema.messages)
     .where(and(eq(schema.messages.requestId, req.id), eq(schema.messages.direction, "out")))
@@ -194,19 +194,19 @@ export async function sendReminderFor(acc: MailAccount, req: Request): Promise<v
   });
   const now = new Date();
   const grace = LEGAL[req.jurisdiction].escalationGraceDays;
-  db.update(schema.requests)
+  await db.update(schema.requests)
     .set({ status: "reminded", reminderSentAt: now, escalationDeadlineAt: addDays(now, grace), updatedAt: now })
     .where(eq(schema.requests.id, req.id))
     .run();
-  db.insert(schema.messages)
+  await db.insert(schema.messages)
     .values({ requestId: req.id, direction: "out", kind: "reminder", fromAddr: acc.fromEmail, toAddr: req.toEmail, subject, body, messageId, occurredAt: now })
     .run();
-  log(acc.userId, req.id, "reminder.sent", req.toEmail);
+  await log(acc.userId, req.id, "reminder.sent", req.toEmail);
 }
 
 async function sendReminders(acc: MailAccount, report: WorkerReport) {
-  const db = getDb();
-  const due = db
+  const db = await getDb();
+  const due = await db
     .select()
     .from(schema.requests)
     .where(and(eq(schema.requests.userId, acc.userId), eq(schema.requests.status, "overdue"), eq(schema.requests.autoRemind, true)))
@@ -217,25 +217,25 @@ async function sendReminders(acc: MailAccount, report: WorkerReport) {
       report.remindersSent++;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      log(acc.userId, req.id, "reminder.failed", msg, "error");
+      await log(acc.userId, req.id, "reminder.failed", msg, "error");
       report.errors.push(`reminder ${req.reference}: ${msg}`);
     }
   }
 }
 
 async function pollInbox(acc: MailAccount, report: WorkerReport) {
-  const db = getDb();
+  const db = await getDb();
   try {
     const { mails, lastUid } = await fetchNewMail(acc, acc.imapLastUid);
     for (const mail of mails) {
-      const matched = matchRequest(acc.userId, mail.inReplyTo, mail.references, mail.subject, mail.text, mail.from);
+      const matched = await matchRequest(acc.userId, mail.inReplyTo, mail.references, mail.subject, mail.text, mail.from);
       if (!matched) {
         report.inboundIgnored++;
         continue;
       }
       if (isAutoReply(mail.subject, mail.headers)) {
         // store but don't change status
-        db.insert(schema.messages)
+        await db.insert(schema.messages)
           .values({
             requestId: matched.id,
             direction: "in",
@@ -254,7 +254,7 @@ async function pollInbox(acc: MailAccount, report: WorkerReport) {
         continue;
       }
       const cls = classifyReply(mail.subject, mail.text);
-      db.insert(schema.messages)
+      await db.insert(schema.messages)
         .values({
           requestId: matched.id,
           direction: "in",
@@ -279,47 +279,48 @@ async function pollInbox(acc: MailAccount, report: WorkerReport) {
         else if (cls === "acknowledged" && ["sent", "overdue"].includes(matched.status)) Object.assign(patch, { status: "acknowledged" });
         // unknown: keep status; the user reviews it in the UI
       }
-      db.update(schema.requests).set(patch).where(eq(schema.requests.id, matched.id)).run();
-      log(acc.userId, matched.id, "reply.received", `${cls} from ${mail.from}`);
+      await db.update(schema.requests).set(patch).where(eq(schema.requests.id, matched.id)).run();
+      await log(acc.userId, matched.id, "reply.received", `${cls} from ${mail.from}`);
       report.inboundMatched++;
     }
-    db.update(schema.mailAccounts)
+    await db.update(schema.mailAccounts)
       .set({ imapLastUid: lastUid, imapLastPollAt: new Date(), imapLastError: null })
       .where(eq(schema.mailAccounts.id, acc.id))
       .run();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    db.update(schema.mailAccounts).set({ imapLastError: msg, imapLastPollAt: new Date() }).where(eq(schema.mailAccounts.id, acc.id)).run();
-    log(acc.userId, null, "imap.failed", msg, "error");
+    await db.update(schema.mailAccounts).set({ imapLastError: msg, imapLastPollAt: new Date() }).where(eq(schema.mailAccounts.id, acc.id)).run();
+    await log(acc.userId, null, "imap.failed", msg, "error");
     report.errors.push(`imap ${acc.fromEmail}: ${msg}`);
   }
 }
 
-function matchRequest(userId: number, inReplyTo: string | null, references: string[], subject: string, text: string, from: string): Request | null {
-  const db = getDb();
+async function matchRequest(userId: number, inReplyTo: string | null, references: string[], subject: string, text: string, from: string): Promise<Request | null> {
+  const db = await getDb();
   // 1) threading headers
   const ids = [inReplyTo, ...references].filter((x): x is string => !!x);
   if (ids.length) {
-    const out = db
+    const out = await db
       .select({ requestId: schema.messages.requestId })
       .from(schema.messages)
       .where(and(eq(schema.messages.direction, "out"), inArray(schema.messages.messageId, ids)))
       .get();
     if (out) {
-      const req = db.select().from(schema.requests).where(and(eq(schema.requests.id, out.requestId), eq(schema.requests.userId, userId))).get();
+      const req = await db.select().from(schema.requests).where(and(eq(schema.requests.id, out.requestId), eq(schema.requests.userId, userId))).get();
       if (req) return req;
     }
   }
   // 2) reference code in subject or body
   const refs = new Set([...(subject.match(REFERENCE_REGEX) ?? []), ...(text.slice(0, 5000).match(REFERENCE_REGEX) ?? [])]);
   for (const ref of refs) {
-    const req = db.select().from(schema.requests).where(and(eq(schema.requests.reference, ref), eq(schema.requests.userId, userId))).get();
+    const req = await db.select().from(schema.requests).where(and(eq(schema.requests.reference, ref), eq(schema.requests.userId, userId))).get();
     if (req) return req;
   }
   // 3) sender domain matches an open request's recipient domain (single candidate only)
   const fromDomain = from.match(/@([a-z0-9.-]+)/i)?.[1]?.toLowerCase();
   if (fromDomain) {
-    const open = db
+    const open = (
+      await db
       .select()
       .from(schema.requests)
       .where(
@@ -331,7 +332,7 @@ function matchRequest(userId: number, inReplyTo: string | null, references: stri
         ),
       )
       .all()
-      .filter((r) => r.toEmail.toLowerCase().endsWith("@" + fromDomain) || r.toEmail.toLowerCase().endsWith("." + fromDomain));
+    ).filter((r) => r.toEmail.toLowerCase().endsWith("@" + fromDomain) || r.toEmail.toLowerCase().endsWith("." + fromDomain));
     if (open.length === 1) return open[0];
   }
   return null;

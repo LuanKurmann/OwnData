@@ -13,6 +13,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { runWorkerAction } from "../actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -23,8 +24,8 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
   const tc = await getTranslations("common");
   const locale = await getLocale();
   const status = str(sp.status) as RequestStatus | "";
-  const db = getDb();
-  const rows = db
+  const db = await getDb();
+  const rows = await db
     .select({ req: schema.requests, broker: schema.brokers })
     .from(schema.requests)
     .innerJoin(schema.brokers, eq(schema.brokers.id, schema.requests.brokerId))

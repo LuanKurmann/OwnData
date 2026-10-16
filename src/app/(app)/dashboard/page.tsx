@@ -13,6 +13,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { runWorkerAction } from "../actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 const OPEN = ["queued", "sent", "acknowledged", "needs_info", "overdue", "reminded", "escalation_ready"] as const;
 const ATTENTION = ["needs_info", "escalation_ready", "failed", "draft"] as const;
@@ -24,18 +25,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const tc = await getTranslations("common");
   const tr = await getTranslations("requests");
   const locale = await getLocale();
-  const db = getDb();
+  const db = await getDb();
 
-  const profile = getProfile(user.id);
-  const mail = getMailAccount(user.id);
-  const all = db.select().from(schema.requests).where(eq(schema.requests.userId, user.id)).all();
+  const profile = await getProfile(user.id);
+  const mail = await getMailAccount(user.id);
+  const all = await db.select().from(schema.requests).where(eq(schema.requests.userId, user.id)).all();
   const open = all.filter((r) => (OPEN as readonly string[]).includes(r.status)).length;
   const completed = all.filter((r) => r.status === "completed").length;
   const overdue = all.filter((r) => ["overdue", "reminded", "escalation_ready"].includes(r.status)).length;
   const contacted = new Set(all.map((r) => r.brokerId)).size;
-  const total = visibleBrokers(user.id).length;
+  const total = (await visibleBrokers(user.id)).length;
 
-  const attention = db
+  const attention = await db
     .select({ req: schema.requests, broker: schema.brokers })
     .from(schema.requests)
     .innerJoin(schema.brokers, eq(schema.brokers.id, schema.requests.brokerId))
@@ -44,16 +45,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .limit(20)
     .all();
   // replies that could not be classified on non-closed requests
-  const unknownReplies = db
+  const unknownReplies = (
+    await db
     .select({ req: schema.requests, broker: schema.brokers })
     .from(schema.messages)
     .innerJoin(schema.requests, eq(schema.requests.id, schema.messages.requestId))
     .innerJoin(schema.brokers, eq(schema.brokers.id, schema.requests.brokerId))
     .where(and(eq(schema.requests.userId, user.id), eq(schema.messages.direction, "in"), eq(schema.messages.classification, "unknown")))
     .all()
-    .filter((r) => !["completed", "rejected", "escalated"].includes(r.req.status));
+  ).filter((r) => !["completed", "rejected", "escalated"].includes(r.req.status));
 
-  const activity = db
+  const activity = await db
     .select()
     .from(schema.activityLog)
     .where(eq(schema.activityLog.userId, user.id))

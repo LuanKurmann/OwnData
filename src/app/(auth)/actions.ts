@@ -23,7 +23,7 @@ const registerSchema = z.object({
 });
 
 export async function registerAction(formData: FormData) {
-  if (!registrationOpen()) redirectFlash("/register", "registrationClosed", "err");
+  if (!(await registrationOpen())) redirectFlash("/register", "registrationClosed", "err");
   const parsed = registerSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     const pw = parsed.error.issues.some((i) => i.path[0] === "password");

@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema, } from "@/db";
 import { BROKER_CATEGORIES, JURISDICTIONS, REQUEST_TYPES } from "@/db/schema";
@@ -17,10 +17,10 @@ export async function createRequestsAction(formData: FormData) {
   const mode = String(formData.get("mode")) === "draft" ? "draft" : "queue";
   const sendNow = String(formData.get("mode")) === "send";
   if (ids.length === 0) redirectFlash("/brokers", "invalid", "err");
-  const profile = getProfile(user.id);
+  const profile = await getProfile(user.id);
   if (!profile.fullName) redirectFlash("/profile", "noProfile", "err");
-  if (mode === "queue" && !getMailAccount(user.id)) redirectFlash("/settings/mail", "noMail", "err");
-  const res = createRequests({ userId: user.id, brokerIds: ids, type, queue: mode === "queue" });
+  if (mode === "queue" && !(await getMailAccount(user.id))) redirectFlash("/settings/mail", "noMail", "err");
+  const res = await createRequests({ userId: user.id, brokerIds: ids, type, queue: mode === "queue" });
   if (sendNow && res.created.length) await runWorker(user.id);
   revalidatePath("/requests");
   revalidatePath("/brokers");
@@ -53,20 +53,20 @@ export async function saveBrokerAction(formData: FormData) {
   const parsed = brokerSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) redirectFlash(id ? `/brokers/${id}` : "/brokers/new", "invalid", "err");
   const d = parsed.data;
-  const db = getDb();
+  const db = await getDb();
   const values = {
     ...d,
     privacyEmail: d.privacyEmail.trim().toLowerCase(),
     requiresIdVerification: d.requiresIdVerification === "on",
   };
   if (id) {
-    const own = db.select().from(schema.brokers).where(and(eq(schema.brokers.id, id), eq(schema.brokers.userId, user.id))).get();
+    const own = await db.select().from(schema.brokers).where(and(eq(schema.brokers.id, id), eq(schema.brokers.userId, user.id))).get();
     if (!own) redirectFlash("/brokers", "invalid", "err");
-    db.update(schema.brokers).set(values).where(eq(schema.brokers.id, id)).run();
+    await db.update(schema.brokers).set(values).where(eq(schema.brokers.id, id)).run();
     revalidatePath("/brokers");
     redirectFlash(`/brokers/${id}`, "saved");
   }
-  const row = db
+  const row = await db
     .insert(schema.brokers)
     .values({ ...values, userId: user.id, slug: `${slugify(d.name)}-${user.id}-${Date.now().toString(36)}`, isCurated: false })
     .returning({ id: schema.brokers.id })
@@ -78,12 +78,12 @@ export async function saveBrokerAction(formData: FormData) {
 export async function copyBrokerAction(formData: FormData) {
   const user = await requireUser();
   const id = Number(formData.get("id"));
-  const db = getDb();
-  const src = db.select().from(schema.brokers).where(eq(schema.brokers.id, id)).get();
+  const db = await getDb();
+  const src = await db.select().from(schema.brokers).where(eq(schema.brokers.id, id)).get();
   if (!src) redirectFlash("/brokers", "invalid", "err");
   const { id: _id, createdAt: _c, ...rest } = src;
   void _id; void _c;
-  const row = db
+  const row = await db
     .insert(schema.brokers)
     .values({ ...rest, userId: user.id, isCurated: false, slug: `${src.slug}-copy-${user.id}-${Date.now().toString(36)}`, name: `${src.name} (Kopie)` })
     .returning({ id: schema.brokers.id })
@@ -95,7 +95,16 @@ export async function copyBrokerAction(formData: FormData) {
 export async function deleteBrokerAction(formData: FormData) {
   const user = await requireUser();
   const id = Number(formData.get("id"));
-  getDb().delete(schema.brokers).where(and(eq(schema.brokers.id, id), eq(schema.brokers.userId, user.id))).run();
+  const db = await getDb();
+  const own = await db.select({ id: schema.brokers.id }).from(schema.brokers).where(and(eq(schema.brokers.id, id), eq(schema.brokers.userId, user.id))).get();
+  if (!own) redirectFlash("/brokers", "invalid", "err");
+  const reqIds = (await db.select({ id: schema.requests.id }).from(schema.requests).where(eq(schema.requests.brokerId, id)).all()).map((r) => r.id);
+  if (reqIds.length) {
+    await db.delete(schema.messages).where(inArray(schema.messages.requestId, reqIds)).run();
+    await db.delete(schema.activityLog).where(inArray(schema.activityLog.requestId, reqIds)).run();
+    await db.delete(schema.requests).where(inArray(schema.requests.id, reqIds)).run();
+  }
+  await db.delete(schema.brokers).where(eq(schema.brokers.id, id)).run();
   revalidatePath("/brokers");
   redirectFlash("/brokers", "deleted");
 }

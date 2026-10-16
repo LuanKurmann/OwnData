@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function ProfilePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   const user = await requireUser();
-  const p = getProfile(user.id);
+  const p = await getProfile(user.id);
   const t = await getTranslations("profile");
   const tc = await getTranslations("common");
   return (

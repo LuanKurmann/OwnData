@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import type { Db } from "./index";
 import { brokers, templates, type BrokerCategory, type Jurisdiction } from "./schema";
 import brokerSeed from "@/data/brokers.json";
@@ -20,24 +20,22 @@ type SeedBroker = {
 };
 
 /** Insert curated brokers and system templates that are not present yet. Never touches user data. */
-export function seedSystemData(db: Db) {
+export async function seedSystemData(db: Db) {
   const existingBrokers = new Set(
-    db.select({ slug: brokers.slug }).from(brokers).where(isNull(brokers.userId)).all().map((r) => r.slug),
+    (await db.select({ slug: brokers.slug }).from(brokers).where(isNull(brokers.userId)).all()).map((r) => r.slug),
   );
-  for (const b of brokerSeed as SeedBroker[]) {
-    if (existingBrokers.has(b.slug)) continue;
-    db.insert(brokers)
-      .values({ ...b, userId: null, isCurated: true })
-      .run();
+  const missing = (brokerSeed as SeedBroker[]).filter((b) => !existingBrokers.has(b.slug));
+  if (missing.length) {
+    await db.insert(brokers).values(missing.map((b) => ({ ...b, userId: null, isCurated: true }))).run();
   }
 
+  const existingTemplates = new Map(
+    (await db.select({ id: templates.id, key: templates.key, subject: templates.subject, body: templates.body }).from(templates).where(isNull(templates.userId)).all()).map(
+      (r) => [r.key, r] as const,
+    ),
+  );
   for (const raw of SYSTEM_TEMPLATES) {
     const t = expandSystemTemplate(raw);
-    const existing = db
-      .select({ id: templates.id })
-      .from(templates)
-      .where(and(isNull(templates.userId), eq(templates.key, t.key)))
-      .get();
     const values = {
       userId: null,
       key: t.key,
@@ -50,11 +48,12 @@ export function seedSystemData(db: Db) {
       body: t.body,
       isSystem: true,
     };
-    if (existing) {
+    const existing = existingTemplates.get(t.key);
+    if (!existing) {
+      await db.insert(templates).values(values).run();
+    } else if (existing.subject !== t.subject || existing.body !== t.body) {
       // keep system templates in sync with the code; user overrides live in separate rows
-      db.update(templates).set(values).where(eq(templates.id, existing.id)).run();
-    } else {
-      db.insert(templates).values(values).run();
+      await db.update(templates).set(values).where(eq(templates.id, existing.id)).run();
     }
   }
 }

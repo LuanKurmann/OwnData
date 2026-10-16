@@ -17,16 +17,16 @@ export default async function TemplateEditPage({ params, searchParams }: { param
   const { key } = await params;
   const sp = await searchParams;
   const user = await requireUser();
-  const db = getDb();
-  const sys = db.select().from(schema.templates).where(and(isNull(schema.templates.userId), eq(schema.templates.key, key))).get();
+  const db = await getDb();
+  const sys = await db.select().from(schema.templates).where(and(isNull(schema.templates.userId), eq(schema.templates.key, key))).get();
   if (!sys) notFound();
-  const current = resolveTemplate(user.id, key)!;
+  const current = (await resolveTemplate(user.id, key))!;
   const overridden = current.userId === user.id;
   const t = await getTranslations("templates");
   const tc = await getTranslations("common");
 
-  const profile = getProfile(user.id);
-  const acc = getMailAccount(user.id);
+  const profile = await getProfile(user.id);
+  const acc = await getMailAccount(user.id);
   const demoBroker = { ...schema.brokers.$inferSelect, name: "Example Data Corp", website: "https://example.com", dataUrls: "https://example.com/people/you" } as unknown as schema.Broker;
   const vars = buildVars({
     profile,

@@ -8,6 +8,7 @@ import BrokerForm from "../BrokerForm";
 import { discoverAction } from "../actions";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 export default async function NewBrokerPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;

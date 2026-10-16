@@ -1,0 +1,45 @@
+{
+  "name": "owndata",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted personal data removal service (Incogni alternative) for CH DSG, EU GDPR and US CCPA",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
+    "date-fns": "^4.4.0",
+    "drizzle-orm": "^0.44.7",
+    "imapflow": "^1.7.8",
+    "jose": "^6.2.12",
+    "lucide-react": "^1.58.0",
+    "mailparser": "^3.9.40",
+    "next": "^15.5.28",
+    "next-intl": "^4.14.9",
+    "nodemailer": "^7.0.13",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/mailparser": "^3.9.0",
+    "@types/node": "^22.20.5",
+    "@types/nodemailer": "^8.0.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.28",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3"
+  }
+}

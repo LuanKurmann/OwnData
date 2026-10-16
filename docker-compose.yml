@@ -1,0 +1,21 @@
+services:
+  owndata:
+    build: .
+    image: owndata:latest
+    container_name: owndata
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      APP_SECRET: ${APP_SECRET:?set APP_SECRET in .env (openssl rand -hex 32)}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
+      WORKER_INTERVAL_MINUTES: ${WORKER_INTERVAL_MINUTES:-10}
+      WORKER_TOKEN: ${WORKER_TOKEN:-}
+      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-de}
+      DATABASE_PATH: /data/owndata.db
+    volumes:
+      - owndata-data:/data
+
+volumes:
+  owndata-data:

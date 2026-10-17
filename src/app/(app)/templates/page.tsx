@@ -22,9 +22,10 @@ export default async function TemplatesPage({ searchParams }: { searchParams: Pr
     .all();
   const overridden = new Set(all.filter((x) => x.userId === user.id).map((x) => x.key));
   const system = all.filter((x) => x.userId === null).sort((a, b) => a.key.localeCompare(b.key));
-  const groups: Array<{ kind: "request" | "reminder" | "escalation"; label: string }> = [
+  const groups: Array<{ kind: "request" | "reminder" | "followup" | "escalation"; label: string }> = [
     { kind: "request", label: t("kindRequest") },
     { kind: "reminder", label: t("kindReminder") },
+    { kind: "followup", label: t("kindFollowup") },
     { kind: "escalation", label: t("kindEscalation") },
   ];
   return (

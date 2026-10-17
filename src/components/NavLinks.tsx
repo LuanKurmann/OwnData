@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, Send, UserRound, Mail, FileText } from "lucide-react";
+import { LayoutDashboard, Building2, Send, UserRound, Mail, FileText, Inbox } from "lucide-react";
 
-const ICONS = { dashboard: LayoutDashboard, brokers: Building2, requests: Send, profile: UserRound, mail: Mail, templates: FileText };
+const ICONS = { dashboard: LayoutDashboard, brokers: Building2, requests: Send, inbox: Inbox, profile: UserRound, mail: Mail, templates: FileText };
 
-export type NavItem = { key: keyof typeof ICONS; href: string; label: string };
+export type NavItem = { key: keyof typeof ICONS; href: string; label: string; badge?: number };
 
 export default function NavLinks({ items }: { items: NavItem[] }) {
   const path = usePathname();
@@ -25,7 +25,8 @@ export default function NavLinks({ items }: { items: NavItem[] }) {
             }`}
           >
             <Icon className="h-4 w-4" />
-            {it.label}
+            <span className="flex-1">{it.label}</span>
+            {it.badge ? <span className="rounded-full bg-amber-100 px-1.5 text-xs font-medium text-amber-800 dark:bg-amber-900 dark:text-amber-200">{it.badge}</span> : null}
           </Link>
         );
       })}

@@ -68,6 +68,7 @@ export default async function BrokerDetailPage({ params, searchParams }: { param
             <Row k={t("privacyUrl")} v={b.privacyUrl ? <a className="text-brand-600 underline break-all" href={b.privacyUrl} target="_blank" rel="noreferrer">{b.privacyUrl}</a> : "—"} />
             <Row k={t("optOutUrl")} v={b.optOutUrl ? <a className="text-brand-600 underline break-all" href={b.optOutUrl} target="_blank" rel="noreferrer">{b.optOutUrl}</a> : "—"} />
             <Row k={t("requiresId")} v={b.requiresIdVerification ? tc("yes") : tc("no")} />
+            <Row k={t("channel")} v={b.preferredChannel === "form" ? t("channelForm") : t("channelEmail")} />
             <Row k={t("notes")} v={b.notes || "—"} />
           </dl>
           <p className="mt-4 text-xs text-slate-500">{t("curatedReadonly")}</p>

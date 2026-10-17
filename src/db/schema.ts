@@ -13,6 +13,7 @@ export const REQUEST_STATUSES = [
   "sent",
   "acknowledged",
   "needs_info",
+  "action_required",
   "completed",
   "rejected",
   "overdue",
@@ -20,6 +21,7 @@ export const REQUEST_STATUSES = [
   "escalation_ready",
   "escalated",
   "failed",
+  "bounced",
 ] as const;
 export type RequestStatus = (typeof REQUEST_STATUSES)[number];
 
@@ -133,6 +135,8 @@ export const brokers = sqliteTable(
     category: text("category", { enum: BROKER_CATEGORIES }).notNull().default("other"),
     language: text("language", { enum: ["de", "en"] }).notNull().default("en"),
     requiresIdVerification: integer("requires_id_verification", { mode: "boolean" }).notNull().default(false),
+    /** email: accepts requests by e-mail; form: only via web form/portal (e-mail gets an auto-reply or bounces) */
+    preferredChannel: text("preferred_channel", { enum: ["email", "form"] }).notNull().default("email"),
     notes: text("notes").notNull().default(""),
     /** For custom removals: where the user's data was found */
     dataUrls: text("data_urls").notNull().default(""),
@@ -150,7 +154,7 @@ export const templates = sqliteTable(
     userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
     key: text("key").notNull(), // e.g. gdpr_erasure_de
     jurisdiction: text("jurisdiction", { enum: JURISDICTIONS }).notNull(),
-    kind: text("kind", { enum: ["request", "reminder", "escalation"] }).notNull(),
+    kind: text("kind", { enum: ["request", "reminder", "escalation", "followup"] }).notNull(),
     requestType: text("request_type", { enum: REQUEST_TYPES }), // null for reminder/escalation
     language: text("language", { enum: ["de", "en"] }).notNull(),
     name: text("name").notNull(),
@@ -214,6 +218,56 @@ export const messages = sqliteTable(
   (t) => [index("messages_request_idx").on(t.requestId), index("messages_mid_idx").on(t.messageId)],
 );
 
+export const INBOX_STATUSES = ["unmatched", "matched", "ignored"] as const;
+export type InboxStatus = (typeof INBOX_STATUSES)[number];
+
+export const CLASSIFICATIONS = ["completed", "rejected", "needs_info", "action_required", "acknowledged", "auto_reply", "bounced", "unknown"] as const;
+export type Classification = (typeof CLASSIFICATIONS)[number];
+
+/** Every inbound e-mail fetched via IMAP, matched to a request or waiting for manual assignment. */
+export const inbox = sqliteTable(
+  "inbox",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    requestId: integer("request_id").references(() => requests.id, { onDelete: "set null" }),
+    status: text("status", { enum: INBOX_STATUSES }).notNull().default("unmatched"),
+    imapUid: integer("imap_uid"),
+    messageId: text("message_id"),
+    inReplyTo: text("in_reply_to"),
+    fromAddr: text("from_addr").notNull().default(""),
+    fromName: text("from_name").notNull().default(""),
+    toAddr: text("to_addr").notNull().default(""),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    /** JSON array of { url, label } extracted from the mail */
+    links: text("links").notNull().default("[]"),
+    classification: text("classification", { enum: CLASSIFICATIONS }).notNull().default("unknown"),
+    /** JSON array of action hints: verify_identity, click_link, fill_form, provide_info, confirm_request */
+    hints: text("hints").notNull().default("[]"),
+    /** set when the user finished the required action or reviewed the mail */
+    handledAt: integer("handled_at", { mode: "timestamp" }),
+    receivedAt: integer("received_at", { mode: "timestamp" }).notNull().default(now),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
+  },
+  (t) => [index("inbox_user_idx").on(t.userId), index("inbox_request_idx").on(t.requestId), index("inbox_mid_idx").on(t.messageId)],
+);
+
+/** Learned mapping sender address/domain -> broker, created when the user assigns a mail manually. */
+export const senderRules = sqliteTable(
+  "sender_rules",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    brokerId: integer("broker_id").notNull().references(() => brokers.id, { onDelete: "cascade" }),
+    /** lower-case e-mail address or host name */
+    pattern: text("pattern").notNull(),
+    kind: text("kind", { enum: ["address", "domain"] }).notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
+  },
+  (t) => [index("sender_rules_user_idx").on(t.userId, t.pattern)],
+);
+
 export const activityLog = sqliteTable(
   "activity_log",
   {
@@ -237,3 +291,7 @@ export type Broker = typeof brokers.$inferSelect;
 export type Template = typeof templates.$inferSelect;
 export type Request = typeof requests.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type InboxMail = typeof inbox.$inferSelect;
+export type SenderRule = typeof senderRules.$inferSelect;
+export type ExtractedLink = { url: string; label: string };
+export type ActionHint = "verify_identity" | "click_link" | "fill_form" | "provide_info" | "confirm_request";

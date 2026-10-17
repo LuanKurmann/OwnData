@@ -11,7 +11,10 @@ Rechtsgrundlagen: **Schweizer DSG** (Art. 25, 30, 32), **EU-DSGVO** (Art. 15, 17
 - **Kuratierte Broker-Liste** (CH, DE/AT, EU, US: Personensuche, Adresshandel, Bonität, B2B-Daten, Adtech) plus **eigene Einträge** für jede Website, die deine Daten zeigt. Die App sucht auf der Website automatisch nach einer Datenschutz-Kontaktadresse.
 - **Rechtssichere Vorlagen** in DE/EN pro Rechtsordnung und Anfrageart, mit Platzhaltern für deine Profildaten. Jede Vorlage ist pro Nutzer überschreibbar.
 - **Versand über dein Postfach** (SMTP). Jede Anfrage trägt eine Referenz `[OD-XXXXXX]` im Betreff.
-- **Antworten automatisch zuordnen** (IMAP): per Threading-Header, Referenz oder Absenderdomain. Antworten werden heuristisch eingestuft (bestätigt, erledigt, abgelehnt, Rückfrage).
+- **Posteingang**: Alle Antworten werden per IMAP eingelesen und zugeordnet (Threading-Header, Referenz, gelernte Absenderregeln, Absenderdomain, Broker-Name bei Ticketsystemen wie Zendesk oder OneTrust). Nicht zuordenbare Mails landen im Posteingang und werden per Klick zugeordnet; die App merkt sich den Absender.
+- **Einstufung und nächste Schritte**: Antworten werden regelbasiert eingestuft (Eingang bestätigt, erledigt, abgelehnt, Rückfrage, Aktion nötig, unzustellbar). Links aus der Antwort erscheinen als Buttons, verlangte Aktionen als Checkliste. Unzustellbare Mails setzen die Anfrage auf „Unzustellbar“ und zeigen die korrigierte Adresse oder das Formular des Brokers.
+- **Antworten aus der App**: Antwort-Editor im Thread mit Vorlagen (Identität ohne Ausweiskopie, Angaben nachliefern, Anfrage bestätigen, Stand nachfragen), Versand im selben Mail-Thread.
+- **Nur-Formular-Broker**: Einträge, die E-Mail-Anfragen nicht bearbeiten (z.B. FastPeopleSearch, Kaspr, LiveRamp, Oracle), sind markiert und verlinken direkt auf ihr Formular.
 - **Fristen und Eskalation**: 30 Tage (DSG/DSGVO) bzw. 45/15 Tage (CCPA). Nach Ablauf automatische Erinnerung, 14 Tage später Status „Eskalation möglich“ mit fertigem Beschwerdetext (EDÖB, EU-Aufsichtsbehörde, CPPA).
 - **Mehrnutzerfähig**: Login mit E-Mail und Passwort, erster Nutzer ist Admin, Registrierung per `ALLOW_REGISTRATION` steuerbar. Jeder Nutzer hat eigenes Profil, Mailkonto, eigene Broker und Vorlagen.
 - **Zwei Betriebsarten**: Docker-Container mit lokaler SQLite-Datei, oder Vercel (Hobby, gratis) mit Turso als gehosteter libSQL-Datenbank.
@@ -99,7 +102,8 @@ Nützliche Befehle: `npm run typecheck`, `npm run lint`, `npm run build`, `npm r
 ## Ablauf einer Anfrage
 
 ```
-Entwurf → Wartet auf Versand → Gesendet → Bestätigt / Rückfrage
+Entwurf → Wartet auf Versand → Gesendet → Bestätigt / Rückfrage / Aktion nötig
+                                  │   └─ Unzustellbar → Adresse korrigieren → erneut senden
                                   │
                         Frist abgelaufen → Überfällig → Erinnerung → Erinnert
                                                                       │
@@ -111,7 +115,7 @@ Status lassen sich jederzeit manuell setzen. Antworten, die nicht eingestuft wer
 
 ## Hinweise
 
-- Die Kontaktdaten der kuratierten Broker stammen aus öffentlichen Datenschutzerklärungen (Stand Oktober 2026) und können sich ändern. Prüfe sie vor dem ersten Versand und erstelle bei Bedarf eine eigene Kopie des Eintrags. Ergänzungen sind in `src/data/brokers.json` willkommen.
+- Die Kontaktdaten der kuratierten Broker stammen aus öffentlichen Datenschutzerklärungen und Data-Broker-Registern (Stand Oktober 2026) und wurden nach einem ersten Testlauf mit echten Antworten korrigiert. Sie können sich ändern: Unzustellbare Mails werden automatisch erkannt und markiert. Die kuratierte Liste wird bei jedem Start mit `src/data/brokers.json` abgeglichen; Ergänzungen sind dort willkommen.
 - Die Vorlagen verzichten bewusst auf Ausweiskopien. Verlangt ein Empfänger einen Identitätsnachweis, erkennt die App das meist als „Rückfrage“; entscheide dann selbst, was du nachreichst.
 - CCPA-Rechte gelten formal für Einwohner Kaliforniens. Viele US-Broker löschen trotzdem weltweit; die Vorlagen sind entsprechend formuliert.
 - OwnData ist keine Rechtsberatung.

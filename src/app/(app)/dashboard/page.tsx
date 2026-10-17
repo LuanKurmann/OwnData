@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { getLocale, getTranslations } from "next-intl/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { CheckCircle2, Circle, AlertTriangle } from "lucide-react";
 import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { getMailAccount, getProfile, visibleBrokers } from "@/server/requests";
+import { unmatchedCount } from "@/server/inbox";
 import type { SearchParams } from "@/lib/flash";
 import { fmtDateTime } from "@/lib/format";
 import Flash from "@/components/Flash";
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
 
 const OPEN = ["queued", "sent", "acknowledged", "needs_info", "overdue", "reminded", "escalation_ready"] as const;
-const ATTENTION = ["needs_info", "escalation_ready", "failed", "draft"] as const;
+const ATTENTION = ["needs_info", "action_required", "bounced", "escalation_ready", "failed", "draft"] as const;
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
@@ -47,13 +48,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // replies that could not be classified on non-closed requests
   const unknownReplies = (
     await db
-    .select({ req: schema.requests, broker: schema.brokers })
-    .from(schema.messages)
-    .innerJoin(schema.requests, eq(schema.requests.id, schema.messages.requestId))
-    .innerJoin(schema.brokers, eq(schema.brokers.id, schema.requests.brokerId))
-    .where(and(eq(schema.requests.userId, user.id), eq(schema.messages.direction, "in"), eq(schema.messages.classification, "unknown")))
-    .all()
-  ).filter((r) => !["completed", "rejected", "escalated"].includes(r.req.status));
+      .select({ req: schema.requests, broker: schema.brokers })
+      .from(schema.inbox)
+      .innerJoin(schema.requests, eq(schema.requests.id, schema.inbox.requestId))
+      .innerJoin(schema.brokers, eq(schema.brokers.id, schema.requests.brokerId))
+      .where(and(eq(schema.inbox.userId, user.id), eq(schema.inbox.classification, "unknown"), isNull(schema.inbox.handledAt)))
+      .all()
+  ).filter((r) => !["completed", "rejected", "escalated"].includes(r.req.status) && !(ATTENTION as readonly string[]).includes(r.req.status));
+  const unmatched = await unmatchedCount(user.id);
 
   const activity = await db
     .select()
@@ -111,6 +113,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h2 className="mb-3 flex items-center gap-2 font-semibold">
             <AlertTriangle className="h-4 w-4 text-amber-500" /> {t("attention")}
           </h2>
+          {unmatched > 0 ? (
+            <Link href="/inbox" className="mb-2 block rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
+              {t("unmatchedMails", { count: unmatched })}
+            </Link>
+          ) : null}
           {attention.length + unknownReplies.length === 0 ? (
             <p className="text-sm text-slate-500">{t("nothingToDo")}</p>
           ) : (

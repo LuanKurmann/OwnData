@@ -1,14 +1,13 @@
 import "server-only";
-import { and, eq, inArray, isNotNull, lt, or } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { MailAccount, Request } from "@/db/schema";
 import { LEGAL } from "@/lib/legal";
-import { REFERENCE_REGEX } from "@/lib/reference";
-import { classifyReply, isAutoReply } from "@/lib/classify";
 import { render, varsFromRequest } from "@/lib/template-render";
 import { sendMail } from "./mail/smtp";
 import { fetchNewMail } from "./mail/imap";
 import { getProfile, reminderKey, resolveTemplate } from "./requests";
+import { ingestMail } from "./inbox";
 
 export type WorkerReport = {
   startedAt: string;
@@ -16,6 +15,7 @@ export type WorkerReport = {
   sent: number;
   failed: number;
   inboundMatched: number;
+  /** stored in the inbox for manual assignment */
   inboundIgnored: number;
   remindersSent: number;
   overdueMarked: number;
@@ -228,62 +228,13 @@ async function pollInbox(acc: MailAccount, report: WorkerReport) {
   try {
     const { mails, lastUid } = await fetchNewMail(acc, acc.imapLastUid);
     for (const mail of mails) {
-      const matched = await matchRequest(acc.userId, mail.inReplyTo, mail.references, mail.subject, mail.text, mail.from);
-      if (!matched) {
-        report.inboundIgnored++;
-        continue;
-      }
-      if (isAutoReply(mail.subject, mail.headers)) {
-        // store but don't change status
-        await db.insert(schema.messages)
-          .values({
-            requestId: matched.id,
-            direction: "in",
-            kind: "reply",
-            fromAddr: mail.from,
-            toAddr: mail.to,
-            subject: mail.subject,
-            body: mail.text.slice(0, 20000),
-            messageId: mail.messageId,
-            inReplyTo: mail.inReplyTo,
-            classification: "auto_reply",
-            occurredAt: mail.date,
-          })
-          .run();
-        report.inboundMatched++;
-        continue;
-      }
-      const cls = classifyReply(mail.subject, mail.text);
-      await db.insert(schema.messages)
-        .values({
-          requestId: matched.id,
-          direction: "in",
-          kind: "reply",
-          fromAddr: mail.from,
-          toAddr: mail.to,
-          subject: mail.subject,
-          body: mail.text.slice(0, 20000),
-          messageId: mail.messageId,
-          inReplyTo: mail.inReplyTo,
-          classification: cls,
-          occurredAt: mail.date,
-        })
-        .run();
-      const now = new Date();
-      const patch: Partial<Request> = { lastResponseAt: mail.date, updatedAt: now };
-      const terminal = ["completed", "rejected", "escalated"].includes(matched.status);
-      if (!terminal) {
-        if (cls === "completed") Object.assign(patch, { status: "completed", closedAt: now });
-        else if (cls === "rejected") Object.assign(patch, { status: "rejected", closedAt: now });
-        else if (cls === "needs_info") Object.assign(patch, { status: "needs_info" });
-        else if (cls === "acknowledged" && ["sent", "overdue"].includes(matched.status)) Object.assign(patch, { status: "acknowledged" });
-        // unknown: keep status; the user reviews it in the UI
-      }
-      await db.update(schema.requests).set(patch).where(eq(schema.requests.id, matched.id)).run();
-      await log(acc.userId, matched.id, "reply.received", `${cls} from ${mail.from}`);
-      report.inboundMatched++;
+      const res = await ingestMail(acc.userId, mail, acc.fromEmail);
+      if (res.duplicate) continue;
+      if (res.matched) report.inboundMatched++;
+      else report.inboundIgnored++;
     }
-    await db.update(schema.mailAccounts)
+    await db
+      .update(schema.mailAccounts)
       .set({ imapLastUid: lastUid, imapLastPollAt: new Date(), imapLastError: null })
       .where(eq(schema.mailAccounts.id, acc.id))
       .run();
@@ -293,49 +244,6 @@ async function pollInbox(acc: MailAccount, report: WorkerReport) {
     await log(acc.userId, null, "imap.failed", msg, "error");
     report.errors.push(`imap ${acc.fromEmail}: ${msg}`);
   }
-}
-
-async function matchRequest(userId: number, inReplyTo: string | null, references: string[], subject: string, text: string, from: string): Promise<Request | null> {
-  const db = await getDb();
-  // 1) threading headers
-  const ids = [inReplyTo, ...references].filter((x): x is string => !!x);
-  if (ids.length) {
-    const out = await db
-      .select({ requestId: schema.messages.requestId })
-      .from(schema.messages)
-      .where(and(eq(schema.messages.direction, "out"), inArray(schema.messages.messageId, ids)))
-      .get();
-    if (out) {
-      const req = await db.select().from(schema.requests).where(and(eq(schema.requests.id, out.requestId), eq(schema.requests.userId, userId))).get();
-      if (req) return req;
-    }
-  }
-  // 2) reference code in subject or body
-  const refs = new Set([...(subject.match(REFERENCE_REGEX) ?? []), ...(text.slice(0, 5000).match(REFERENCE_REGEX) ?? [])]);
-  for (const ref of refs) {
-    const req = await db.select().from(schema.requests).where(and(eq(schema.requests.reference, ref), eq(schema.requests.userId, userId))).get();
-    if (req) return req;
-  }
-  // 3) sender domain matches an open request's recipient domain (single candidate only)
-  const fromDomain = from.match(/@([a-z0-9.-]+)/i)?.[1]?.toLowerCase();
-  if (fromDomain) {
-    const open = (
-      await db
-      .select()
-      .from(schema.requests)
-      .where(
-        and(
-          eq(schema.requests.userId, userId),
-          or(
-            inArray(schema.requests.status, ["sent", "acknowledged", "needs_info", "overdue", "reminded", "escalation_ready"]),
-          ),
-        ),
-      )
-      .all()
-    ).filter((r) => r.toEmail.toLowerCase().endsWith("@" + fromDomain) || r.toEmail.toLowerCase().endsWith("." + fromDomain));
-    if (open.length === 1) return open[0];
-  }
-  return null;
 }
 
 /** Start the periodic worker once per process. */

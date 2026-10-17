@@ -45,6 +45,8 @@ export default async function BrokersPage({ searchParams }: { searchParams: Prom
       category: b.category,
       isCurated: b.isCurated,
       requiresIdVerification: b.requiresIdVerification,
+      preferredChannel: b.preferredChannel,
+      optOutUrl: b.optOutUrl,
       last: lastByBroker.get(b.id) ?? null,
     }));
 

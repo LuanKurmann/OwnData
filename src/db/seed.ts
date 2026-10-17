@@ -16,17 +16,26 @@ type SeedBroker = {
   category: BrokerCategory;
   language: "de" | "en";
   requiresIdVerification: boolean;
+  preferredChannel: "email" | "form";
   notes: string;
 };
 
 /** Insert curated brokers and system templates that are not present yet. Never touches user data. */
 export async function seedSystemData(db: Db) {
-  const existingBrokers = new Set(
-    (await db.select({ slug: brokers.slug }).from(brokers).where(isNull(brokers.userId)).all()).map((r) => r.slug),
+  const existingBrokers = new Map(
+    (await db.select().from(brokers).where(isNull(brokers.userId)).all()).map((r) => [r.slug, r] as const),
   );
-  const missing = (brokerSeed as SeedBroker[]).filter((b) => !existingBrokers.has(b.slug));
+  const seed = brokerSeed as SeedBroker[];
+  const missing = seed.filter((b) => !existingBrokers.has(b.slug));
   if (missing.length) {
     await db.insert(brokers).values(missing.map((b) => ({ ...b, userId: null, isCurated: true }))).run();
+  }
+  // keep curated contact data in sync with the shipped list (curated rows are read-only for users)
+  for (const b of seed) {
+    const cur = existingBrokers.get(b.slug);
+    if (!cur) continue;
+    const changed = (Object.keys(b) as (keyof SeedBroker)[]).some((k) => cur[k] !== b[k]);
+    if (changed) await db.update(brokers).set({ ...b }).where(eq(brokers.id, cur.id)).run();
   }
 
   const existingTemplates = new Map(

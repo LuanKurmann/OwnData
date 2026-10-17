@@ -39,6 +39,7 @@ const brokerSchema = z.object({
   category: z.enum(BROKER_CATEGORIES).default("other"),
   language: z.enum(["de", "en"]),
   requiresIdVerification: z.string().optional(),
+  preferredChannel: z.enum(["email", "form"]).default("email"),
   notes: z.string().max(4000).default(""),
   dataUrls: z.string().max(4000).default(""),
 });

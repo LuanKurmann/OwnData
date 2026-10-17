@@ -11,7 +11,8 @@
     "mail": "Mail account",
     "templates": "Templates",
     "logout": "Log out",
-    "language": "Language"
+    "language": "Language",
+    "inbox": "Inbox"
   },
   "common": {
     "save": "Save",
@@ -56,7 +57,11 @@
     "invalid": "Invalid input.",
     "discoverNone": "No e-mail address found on the website. Please enter it manually.",
     "discoverFound": "Found: {email}",
-    "error": "Error: {error}"
+    "error": "Error: {error}",
+    "assigned": "Assigned. Request status updated.",
+    "ignored": "Mail ignored.",
+    "replySent": "Reply sent.",
+    "actionResolved": "Marked as done, request is waiting for the broker again."
   },
   "auth": {
     "login": "Log in",
@@ -82,7 +87,9 @@
     "reminded": "Reminded",
     "escalation_ready": "Ready to escalate",
     "escalated": "Escalated",
-    "failed": "Failed"
+    "failed": "Failed",
+    "action_required": "Action required",
+    "bounced": "Bounced"
   },
   "type": {
     "erasure": "Erasure",
@@ -121,7 +128,8 @@
     "brokersCovered": "Brokers contacted",
     "ofTotal": "of {total}",
     "lastPoll": "Last inbox poll",
-    "never": "never"
+    "never": "never",
+    "unmatchedMails": "{count} mail(s) in the inbox waiting to be assigned"
   },
   "brokers": {
     "title": "Data brokers",
@@ -161,7 +169,11 @@
     "deleteBroker": "Delete entry",
     "deleteBrokerHint": "Also deletes all requests to this entry.",
     "websitePlaceholder": "e.g. example.com",
-    "foundEmails": "Addresses found"
+    "foundEmails": "Addresses found",
+    "channel": "Channel",
+    "channelEmail": "E-mail",
+    "channelForm": "Form only",
+    "channelFormHint": "This broker only processes requests through its web form or portal."
   },
   "requests": {
     "title": "Requests",
@@ -207,7 +219,31 @@
     "manualNote": "Add a manual note",
     "addNote": "Save note",
     "idWarning": "This recipient usually requires proof of identity. Expect a follow-up question.",
-    "resend": "Send again"
+    "resend": "Send again",
+    "nextSteps": "Next steps",
+    "nextStepsIntro": "The recipient replied and asks you to do something. Complete the items below, then mark the action as done.",
+    "nextStepsUnknown": "The reply could not be classified automatically. Read it in the thread and set the status yourself.",
+    "linksFound": "Links from the reply",
+    "actionDone": "Action done, waiting for broker",
+    "reply": "Reply",
+    "replyIntro": "The reply is sent in the same e-mail thread to the recipient.",
+    "replyTemplate": "Load template",
+    "replySubject": "Subject",
+    "replyBody": "Body",
+    "sendReply": "Send reply",
+    "tpl_identity": "Identity without ID copy",
+    "tpl_info": "Provide details",
+    "tpl_confirm": "Confirm request",
+    "tpl_status": "Ask for status",
+    "inboundMail": "Reply",
+    "markReviewed": "Reviewed",
+    "bouncedTitle": "E-mail could not be delivered",
+    "bouncedIntro": "The address does not exist or rejects external senders. Check the broker entry, correct the recipient address below and send again, or use the broker's form.",
+    "openForm": "Open form",
+    "openPrivacyPage": "Privacy page",
+    "checkBroker": "Check broker entry",
+    "brokerHasNewEmail": "The broker entry now has a different address: {email}. It is already filled in below.",
+    "formOnlyHint": "This broker usually accepts requests only through its form:"
   },
   "profile": {
     "title": "My profile",
@@ -278,6 +314,42 @@
     "placeholders": "Available placeholders",
     "reset": "Reset to system template",
     "editTitle": "Edit template",
-    "preview": "Preview with your profile data"
+    "preview": "Preview with your profile data",
+    "kindFollowup": "Reply to follow-up question"
+  },
+  "classification": {
+    "completed": "Completed",
+    "rejected": "Rejected",
+    "needs_info": "Needs info",
+    "action_required": "Action required",
+    "acknowledged": "Acknowledged",
+    "auto_reply": "Auto-reply",
+    "unknown": "Unclear, please review",
+    "bounced": "Bounced"
+  },
+  "hints": {
+    "verify_identity": "Identity verification requested",
+    "click_link": "Click a link",
+    "fill_form": "Fill in a form / portal",
+    "provide_info": "Additional details needed",
+    "confirm_request": "Confirm the request"
+  },
+  "inbox": {
+    "title": "Inbox",
+    "intro": "All replies from your mailbox. Automatically matched mails go straight to their request; assign the rest here with one click. The app remembers the sender for next time.",
+    "poll": "Fetch mail",
+    "tab_open": "Open",
+    "tab_matched": "Matched",
+    "tab_ignored": "Ignored",
+    "empty_open": "No open mails. Everything is matched.",
+    "empty_matched": "No matched mails yet.",
+    "empty_ignored": "No ignored mails.",
+    "showBody": "Show message",
+    "assignTo": "Select request…",
+    "assign": "Assign",
+    "learn": "Remember sender",
+    "learnHint": "Future mails from this address/domain are matched to this broker automatically.",
+    "ignore": "Ignore",
+    "unignore": "Restore"
   }
 }

@@ -17,6 +17,8 @@ export type BrokerRow = {
   category: string;
   isCurated: boolean;
   requiresIdVerification: boolean;
+  preferredChannel: "email" | "form";
+  optOutUrl: string;
   last: { status: RequestStatus; type: RequestType } | null;
 };
 
@@ -85,6 +87,7 @@ export default function BrokerTable({ rows, action }: { rows: BrokerRow[]; actio
                     <Link href={`/brokers/${r.id}`} className="font-medium hover:underline">{r.name}</Link>
                     {r.requiresIdVerification ? <ShieldAlert className="h-3.5 w-3.5 text-amber-500" aria-label={t("requiresId")} /> : null}
                     {!r.isCurated ? <span className="badge bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">{t("custom")}</span> : null}
+                    {r.preferredChannel === "form" ? <span className="badge bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" title={t("channelFormHint")}>{t("channelForm")}</span> : null}
                   </div>
                   {r.website ? (
                     <a href={r.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-slate-500 hover:underline">
@@ -92,7 +95,10 @@ export default function BrokerTable({ rows, action }: { rows: BrokerRow[]; actio
                     </a>
                   ) : null}
                 </td>
-                <td className="font-mono text-xs">{r.privacyEmail || <span className="text-slate-400">{t("noEmail")}</span>}</td>
+                <td className="font-mono text-xs">
+                  {r.privacyEmail || <span className="text-slate-400">{t("noEmail")}</span>}
+                  {!r.privacyEmail && r.optOutUrl ? <a href={r.optOutUrl} target="_blank" rel="noreferrer" className="block text-brand-600 underline">{t("optOutUrl")}</a> : null}
+                </td>
                 <td>{r.country}</td>
                 <td className="whitespace-nowrap">{tj(r.jurisdiction)}</td>
                 <td className="text-xs">{tc(r.category as never)}</td>

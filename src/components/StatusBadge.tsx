@@ -7,6 +7,7 @@ const COLORS: Record<RequestStatus, string> = {
   sent: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
   acknowledged: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
   needs_info: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  action_required: "bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100",
   completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
   rejected: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200",
   overdue: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
@@ -14,6 +15,7 @@ const COLORS: Record<RequestStatus, string> = {
   escalation_ready: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   escalated: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   failed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  bounced: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
 };
 
 export default function StatusBadge({ status }: { status: RequestStatus }) {

@@ -6,14 +6,18 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth";
 import { LEGAL, JURISDICTION_LABEL } from "@/lib/legal";
 import { render, varsFromRequest } from "@/lib/template-render";
-import { escalationKey, getMailAccount, getProfile, resolveTemplate } from "@/server/requests";
+import { escalationKey, followupKey, getMailAccount, getProfile, resolveTemplate, FOLLOWUP_KINDS, type FollowupKind } from "@/server/requests";
+import { parseHints, parseLinks } from "@/server/inbox";
+import ClassificationBadge from "@/components/ClassificationBadge";
+import { ExternalLink } from "lucide-react";
+import { str } from "@/lib/flash";
 import type { SearchParams } from "@/lib/flash";
 import { daysUntil, fmtDate, fmtDateTime } from "@/lib/format";
 import Flash from "@/components/Flash";
 import StatusBadge from "@/components/StatusBadge";
 import SubmitButton from "@/components/SubmitButton";
 import CopyButton from "@/components/CopyButton";
-import { deleteRequestAction, queueAction, reminderAction, saveNotesAction, setStatusAction, updateDraftAction } from "../actions";
+import { deleteRequestAction, queueAction, reminderAction, replyAction, resolveActionAction, saveNotesAction, setStatusAction, updateDraftAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
@@ -27,7 +31,17 @@ export default async function RequestDetailPage({ params, searchParams }: { para
   if (!req) notFound();
   const broker = await db.select().from(schema.brokers).where(eq(schema.brokers.id, req.brokerId)).get();
   if (!broker) notFound();
-  const msgs = await db.select().from(schema.messages).where(eq(schema.messages.requestId, req.id)).orderBy(asc(schema.messages.occurredAt)).all();
+  const outMsgs = await db.select().from(schema.messages).where(eq(schema.messages.requestId, req.id)).orderBy(asc(schema.messages.occurredAt)).all();
+  const inMails = await db.select().from(schema.inbox).where(and(eq(schema.inbox.requestId, req.id), eq(schema.inbox.userId, user.id))).orderBy(asc(schema.inbox.receivedAt)).all();
+  type ThreadItem =
+    | { kind: "out"; at: Date; msg: (typeof outMsgs)[number] }
+    | { kind: "in"; at: Date; mail: (typeof inMails)[number] };
+  const thread: ThreadItem[] = [
+    ...outMsgs.map((m) => ({ kind: "out" as const, at: m.occurredAt, msg: m })),
+    ...inMails.map((m) => ({ kind: "in" as const, at: m.receivedAt, mail: m })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime());
+  const latestIn = inMails.filter((m) => m.classification !== "auto_reply").at(-1) ?? null;
+  const th = await getTranslations("hints");
   const t = await getTranslations("requests");
   const tt = await getTranslations("type");
   const tc = await getTranslations("common");
@@ -36,8 +50,20 @@ export default async function RequestDetailPage({ params, searchParams }: { para
   const profile = await getProfile(user.id);
   const acc = await getMailAccount(user.id);
 
-  const editable = ["draft", "failed", "queued"].includes(req.status);
-  const canRemind = ["sent", "acknowledged", "overdue", "reminded", "needs_info", "escalation_ready"].includes(req.status) && !!acc;
+  const editable = ["draft", "failed", "queued", "bounced"].includes(req.status);
+  const canRemind = ["sent", "acknowledged", "overdue", "reminded", "needs_info", "action_required", "escalation_ready"].includes(req.status) && !!acc;
+  const showNextSteps = latestIn && !latestIn.handledAt && ["needs_info", "action_required", "unknown"].includes(latestIn.classification) && !["completed", "rejected", "escalated"].includes(req.status);
+  const canReply = !!acc && !!req.sentAt;
+  // reply composer prefill from a follow-up template
+  const tplKind = (FOLLOWUP_KINDS as readonly string[]).includes(str(sp.tpl)) ? (str(sp.tpl) as FollowupKind) : null;
+  let replyPrefill = { subject: `Re: ${latestIn?.subject || req.subject}`, body: "" };
+  if (tplKind) {
+    const tpl = await resolveTemplate(user.id, followupKey(tplKind, req.language));
+    if (tpl) {
+      const vars = varsFromRequest(req, broker, profile, acc?.fromEmail ?? "");
+      replyPrefill = { subject: latestIn?.subject ? `Re: ${latestIn.subject.replace(/^(re|aw|wg|fwd?):\s*/i, "")}` : render(tpl.subject, vars), body: render(tpl.body, vars) };
+    }
+  }
   const showEscalation = ["overdue", "reminded", "escalation_ready", "escalated", "rejected"].includes(req.status);
   const d = daysUntil(req.deadlineAt);
   const legal = LEGAL[req.jurisdiction];
@@ -67,7 +93,29 @@ export default async function RequestDetailPage({ params, searchParams }: { para
       {broker.requiresIdVerification && !["completed", "rejected"].includes(req.status) ? (
         <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">{t("idWarning")}</p>
       ) : null}
-      {req.lastError ? <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-200">{t("lastError")}: {req.lastError}</p> : null}
+      {req.status === "bounced" ? (
+        <div className="card mb-4 border-red-200 dark:border-red-900">
+          <h2 className="font-semibold text-red-700 dark:text-red-300">{t("bouncedTitle")}</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{t("bouncedIntro")}</p>
+          {req.lastError ? <p className="mt-2 font-mono text-xs text-red-700 dark:text-red-300">{req.lastError}</p> : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {broker.optOutUrl ? <a href={broker.optOutUrl} target="_blank" rel="noreferrer noopener" className="btn-secondary"><ExternalLink className="h-3.5 w-3.5" /> {t("openForm")}</a> : null}
+            {broker.privacyUrl ? <a href={broker.privacyUrl} target="_blank" rel="noreferrer noopener" className="btn-secondary"><ExternalLink className="h-3.5 w-3.5" /> {t("openPrivacyPage")}</a> : null}
+            <Link href={`/brokers/${broker.id}`} className="btn-secondary">{t("checkBroker")}</Link>
+          </div>
+          {broker.privacyEmail && broker.privacyEmail.toLowerCase() !== req.toEmail.toLowerCase() ? (
+            <p className="mt-2 text-xs text-slate-500">{t("brokerHasNewEmail", { email: broker.privacyEmail })}</p>
+          ) : null}
+        </div>
+      ) : req.lastError ? (
+        <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-200">{t("lastError")}: {req.lastError}</p>
+      ) : null}
+      {broker.preferredChannel === "form" && broker.optOutUrl && !["completed", "rejected"].includes(req.status) ? (
+        <p className="mb-4 flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+          {t("formOnlyHint")}
+          <a href={broker.optOutUrl} target="_blank" rel="noreferrer noopener" className="underline">{broker.optOutUrl}</a>
+        </p>
+      ) : null}
 
       <div className="card mb-4 grid gap-3 text-sm md:grid-cols-4">
         <Meta k={t("to")} v={<span className="font-mono text-xs break-all">{req.toEmail}</span>} />
@@ -90,7 +138,7 @@ export default async function RequestDetailPage({ params, searchParams }: { para
       <div className="mb-6 flex flex-wrap gap-2">
         {editable ? (
           <>
-            <form action={queueAction}><input type="hidden" name="id" value={req.id} /><input type="hidden" name="now" value="1" /><SubmitButton>{t("sendNow")}</SubmitButton></form>
+            <form action={queueAction}><input type="hidden" name="id" value={req.id} /><input type="hidden" name="now" value="1" /><SubmitButton>{req.status === "bounced" ? t("resend") : t("sendNow")}</SubmitButton></form>
             {req.status !== "queued" ? <form action={queueAction}><input type="hidden" name="id" value={req.id} /><SubmitButton className="btn-secondary">{t("queue")}</SubmitButton></form> : null}
           </>
         ) : null}
@@ -116,7 +164,7 @@ export default async function RequestDetailPage({ params, searchParams }: { para
           <input type="hidden" name="id" value={req.id} />
           <div>
             <label className="label" htmlFor="toEmail">{t("to")}</label>
-            <input id="toEmail" name="toEmail" type="email" className="input" defaultValue={req.toEmail} required />
+            <input id="toEmail" name="toEmail" type="email" className="input" defaultValue={req.status === "bounced" && broker.privacyEmail && broker.privacyEmail.toLowerCase() !== req.toEmail.toLowerCase() ? broker.privacyEmail : req.toEmail} required />
           </div>
           <div>
             <label className="label" htmlFor="subject">{t("subject")}</label>
@@ -130,31 +178,133 @@ export default async function RequestDetailPage({ params, searchParams }: { para
         </form>
       ) : null}
 
+      {/* Next steps */}
+      {showNextSteps && latestIn ? (
+        <div className="card mb-6 border-amber-200 dark:border-amber-900">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">{t("nextSteps")}</h2>
+            <ClassificationBadge value={latestIn.classification} />
+          </div>
+          <p className="mt-1 text-sm text-slate-500">{latestIn.classification === "unknown" ? t("nextStepsUnknown") : t("nextStepsIntro")}</p>
+          {parseHints(latestIn).length ? (
+            <ul className="mt-3 flex flex-col gap-1 text-sm">
+              {parseHints(latestIn).map((h) => (
+                <li key={h} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> {th(h)}</li>
+              ))}
+            </ul>
+          ) : null}
+          {parseLinks(latestIn).length ? (
+            <div className="mt-3">
+              <div className="mb-1 text-xs uppercase tracking-wide text-slate-500">{t("linksFound")}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {parseLinks(latestIn).slice(0, 6).map((l) => (
+                  <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary px-2 py-1 text-xs" title={l.url}>
+                    <ExternalLink className="h-3 w-3" /> {l.label}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <details className="mt-3" open={latestIn.classification !== "unknown"}>
+            <summary className="cursor-pointer text-xs text-slate-500">{t("inboundMail")}: {latestIn.subject}</summary>
+            <pre className="pre mt-2 max-h-72 overflow-auto">{latestIn.body}</pre>
+          </details>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {canReply ? (
+              <>
+                {(["identity", "info", "confirm", "status"] as FollowupKind[]).map((k) => (
+                  <Link key={k} href={`/requests/${req.id}?tpl=${k}#reply`} className={`btn-secondary ${tplKind === k ? "ring-2 ring-brand-500" : ""}`}>
+                    {t(`tpl_${k}`)}
+                  </Link>
+                ))}
+              </>
+            ) : null}
+            <form action={resolveActionAction} className="ml-auto">
+              <input type="hidden" name="id" value={req.id} />
+              <SubmitButton className="btn-primary">{latestIn.classification === "unknown" ? t("markReviewed") : t("actionDone")}</SubmitButton>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {/* Thread */}
       <div className="card mb-6">
         <h2 className="mb-3 font-semibold">{t("thread")}</h2>
-        {msgs.length === 0 ? (
+        {thread.length === 0 ? (
           <p className="text-sm text-slate-500">{t("noMessages")}</p>
         ) : (
           <ol className="flex flex-col gap-4">
-            {msgs.map((m) => (
-              <li key={m.id} className={`rounded-lg border p-3 ${m.direction === "out" ? "border-slate-200 dark:border-slate-800" : "border-brand-100 bg-brand-50/50 dark:border-slate-700 dark:bg-slate-800/50"}`}>
-                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span className="badge bg-slate-100 dark:bg-slate-800">{m.direction === "out" ? t("out") : t("in")} · {m.kind}</span>
-                  <span>{fmtDateTime(m.occurredAt, locale)}</span>
-                  <span className="truncate">{m.direction === "out" ? `→ ${m.toAddr}` : `← ${m.fromAddr}`}</span>
-                  {m.classification ? <span className="badge bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">{t("classification")}: {m.classification}</span> : null}
-                </div>
-                <div className="text-sm font-medium">{m.subject}</div>
-                <details className="mt-1">
-                  <summary className="cursor-pointer text-xs text-slate-500">{t("body")}</summary>
-                  <pre className="pre mt-2">{m.body}</pre>
-                </details>
-              </li>
-            ))}
+            {thread.map((item) =>
+              item.kind === "out" ? (
+                <li key={`o${item.msg.id}`} className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                  <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span className="badge bg-slate-100 dark:bg-slate-800">{t("out")} · {item.msg.kind}</span>
+                    <span>{fmtDateTime(item.msg.occurredAt, locale)}</span>
+                    <span className="truncate">→ {item.msg.toAddr}</span>
+                  </div>
+                  <div className="text-sm font-medium">{item.msg.subject}</div>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-slate-500">{t("body")}</summary>
+                    <pre className="pre mt-2">{item.msg.body}</pre>
+                  </details>
+                </li>
+              ) : (
+                <li key={`i${item.mail.id}`} className="rounded-lg border border-brand-100 bg-brand-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                  <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <span className="badge bg-slate-100 dark:bg-slate-800">{t("in")}</span>
+                    <span>{fmtDateTime(item.mail.receivedAt, locale)}</span>
+                    <span className="truncate">← {item.mail.fromAddr}</span>
+                    <ClassificationBadge value={item.mail.classification} />
+                    {item.mail.handledAt ? <span className="badge bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">✓</span> : null}
+                  </div>
+                  <div className="text-sm font-medium">{item.mail.subject}</div>
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-xs text-slate-500">{t("body")}</summary>
+                    <pre className="pre mt-2">{item.mail.body}</pre>
+                    {parseLinks(item.mail).length ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {parseLinks(item.mail).slice(0, 6).map((l) => (
+                          <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary px-2 py-1 text-xs" title={l.url}>
+                            <ExternalLink className="h-3 w-3" /> {l.label}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </details>
+                </li>
+              ),
+            )}
           </ol>
         )}
       </div>
+
+      {/* Reply composer */}
+      {canReply ? (
+        <form action={replyAction} id="reply" className="card mb-6 flex flex-col gap-3">
+          <div>
+            <h2 className="font-semibold">{t("reply")}</h2>
+            <p className="text-xs text-slate-500">{t("replyIntro")} → {req.toEmail}</p>
+          </div>
+          <input type="hidden" name="id" value={req.id} />
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-slate-500">{t("replyTemplate")}:</span>
+            {(["identity", "info", "confirm", "status"] as FollowupKind[]).map((k) => (
+              <Link key={k} href={`/requests/${req.id}?tpl=${k}#reply`} className={`rounded-full border px-2 py-0.5 ${tplKind === k ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-slate-800 dark:text-brand-100" : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"}`}>
+                {t(`tpl_${k}`)}
+              </Link>
+            ))}
+          </div>
+          <div>
+            <label className="label" htmlFor="reply-subject">{t("replySubject")}</label>
+            <input id="reply-subject" name="subject" className="input" defaultValue={replyPrefill.subject} required />
+          </div>
+          <div>
+            <label className="label" htmlFor="reply-body">{t("replyBody")}</label>
+            <textarea id="reply-body" name="body" className="input font-mono text-xs" rows={tplKind ? 18 : 8} defaultValue={replyPrefill.body} required />
+          </div>
+          <div><SubmitButton>{t("sendReply")}</SubmitButton></div>
+        </form>
+      ) : null}
 
       {/* Escalation */}
       {showEscalation && escalationText ? (

@@ -3,7 +3,7 @@ import type { Jurisdiction, RequestType } from "@/db/schema";
 export type SystemTemplate = {
   key: string;
   jurisdiction: Jurisdiction;
-  kind: "request" | "reminder" | "escalation";
+  kind: "request" | "reminder" | "escalation" | "followup";
   requestType: RequestType | null;
   language: "de" | "en";
   name: string;
@@ -498,6 +498,198 @@ I request for the last time that you comply with my request within 14 days and c
 
 For your reference, my identification details:
 {{IDENT}}
+
+{{SIG}}`,
+  },
+
+  // ---------------- Follow-ups (replies to broker questions, sent in-thread) ----------------
+  {
+    key: "followup_identity_de",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "de",
+    name: "Antwort: Identitätsnachweis ohne Ausweiskopie – Deutsch",
+    subject: "Re: Antrag {{reference}} – Identifikation",
+    body: `Sehr geehrte Damen und Herren,
+
+vielen Dank für Ihre Rückmeldung zu meinem Antrag {{reference}}. Sie bitten um einen Identitätsnachweis.
+
+Eine Ausweiskopie ist für die Bearbeitung nicht erforderlich und wäre unverhältnismässig: Sie verarbeiten meine Daten nach eigener Darstellung ohne Ausweis, also können Sie meine Identität auch anhand derselben Merkmale abgleichen (Art. 12 Abs. 6 DSGVO bzw. Verhältnismässigkeitsprinzip, Art. 6 Abs. 2 DSG). Diese Nachricht stammt zudem von der Adresse {{senderEmail}}, die in Ihrem Datensatz enthalten sein dürfte.
+
+Zur Identifikation nochmals:
+Name: {{fullName}}
+Geburtsdatum: {{birthDate}}
+Aktuelle Adresse: {{currentAddress}}
+Frühere Adressen:
+{{addresses}}
+E-Mail-Adressen:
+{{emails}}
+Telefonnummern:
+{{phones}}
+
+Sollten Sie trotzdem begründete Zweifel haben, nennen Sie mir bitte konkret das fehlende Merkmal. Eine geschwärzte Ausweiskopie (nur Name, Geburtsdatum und Foto sichtbar) stelle ich notfalls bereit, sofern Sie bestätigen, dass sie nach Prüfung sofort gelöscht wird.
+
+Die ursprüngliche Frist läuft weiter. Bitte bestätigen Sie die Erledigung bis zum {{deadlineDate}}.
+
+{{SIG}}`,
+  },
+  {
+    key: "followup_identity_en",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "en",
+    name: "Reply: identity verification without ID copy – English",
+    subject: "Re: Request {{reference}} – identification",
+    body: `Dear Data Protection Officer,
+
+Thank you for your response to my request {{reference}}. You ask for proof of identity.
+
+A copy of an identity document is not necessary and would be disproportionate: you process my data without any ID document, so you can match my identity against the same attributes (Art. 12(6) GDPR; for US businesses see 11 CCR § 7060, which requires verification to a reasonable degree of certainty, not a government ID). This message also comes from {{senderEmail}}, which is likely part of the record you hold.
+
+For identification once more:
+Name: {{fullName}}
+Date of birth: {{birthDate}}
+Current address: {{currentAddress}}
+Previous addresses:
+{{addresses}}
+E-mail addresses:
+{{emails}}
+Phone numbers:
+{{phones}}
+
+If you still have reasonable doubts, please tell me specifically which attribute is missing. As a last resort I can provide a redacted ID copy (name, date of birth and photo only) if you confirm it will be deleted immediately after verification.
+
+The original deadline continues to run. Please confirm completion by {{deadlineDate}}.
+
+{{SIG}}`,
+  },
+  {
+    key: "followup_info_de",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "de",
+    name: "Antwort: zusätzliche Angaben nachliefern – Deutsch",
+    subject: "Re: Antrag {{reference}} – ergänzende Angaben",
+    body: `Sehr geehrte Damen und Herren,
+
+besten Dank für Ihre Rückmeldung zu meinem Antrag {{reference}}. Gerne ergänze ich die gewünschten Angaben:
+
+Name: {{fullName}}
+Weitere Namensvarianten:
+{{aliases}}
+Geburtsdatum: {{birthDate}}
+Aktuelle Adresse: {{currentAddress}}
+Frühere Adressen:
+{{addresses}}
+E-Mail-Adressen:
+{{emails}}
+Telefonnummern:
+{{phones}}
+Fundstellen meiner Daten:
+{{dataUrls}}
+
+[Hier bei Bedarf die konkret gewünschte Angabe ergänzen.]
+
+Bitte bearbeiten Sie meinen Antrag nun ohne weitere Verzögerung und bestätigen Sie die Erledigung bis zum {{deadlineDate}}.
+
+{{SIG}}`,
+  },
+  {
+    key: "followup_info_en",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "en",
+    name: "Reply: provide additional details – English",
+    subject: "Re: Request {{reference}} – additional details",
+    body: `Dear Data Protection Officer,
+
+Thank you for your response to my request {{reference}}. Please find the requested details below:
+
+Name: {{fullName}}
+Other name variants:
+{{aliases}}
+Date of birth: {{birthDate}}
+Current address: {{currentAddress}}
+Previous addresses:
+{{addresses}}
+E-mail addresses:
+{{emails}}
+Phone numbers:
+{{phones}}
+Where my data appears:
+{{dataUrls}}
+
+[Add the specific detail you were asked for here, if any.]
+
+Please now process my request without further delay and confirm completion by {{deadlineDate}}.
+
+{{SIG}}`,
+  },
+  {
+    key: "followup_confirm_de",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "de",
+    name: "Antwort: Antrag bestätigen – Deutsch",
+    subject: "Re: Antrag {{reference}} – Bestätigung",
+    body: `Sehr geehrte Damen und Herren,
+
+hiermit bestätige ich meinen Antrag {{reference}} vom {{sentDate}} ausdrücklich. Diese Nachricht stammt von der Adresse {{senderEmail}}, von der auch der Antrag gesendet wurde.
+
+Ich bitte Sie, den Antrag nun zu bearbeiten und mir die Erledigung bis zum {{deadlineDate}} zu bestätigen. Sollten Sie zwingend eine Bestätigung über Ihr Formular oder Ihren Link benötigen, habe ich diesen Schritt ebenfalls ausgeführt.
+
+{{SIG}}`,
+  },
+  {
+    key: "followup_confirm_en",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "en",
+    name: "Reply: confirm the request – English",
+    subject: "Re: Request {{reference}} – confirmation",
+    body: `Dear Data Protection Officer,
+
+I hereby expressly confirm my request {{reference}} of {{sentDate}}. This message is sent from {{senderEmail}}, the same address the request was sent from.
+
+Please process the request now and confirm completion by {{deadlineDate}}. Where you strictly require confirmation through your form or link, I have completed that step as well.
+
+{{SIG}}`,
+  },
+  {
+    key: "followup_status_de",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "de",
+    name: "Antwort: Nachfrage zum Stand – Deutsch",
+    subject: "Re: Antrag {{reference}} – Stand der Bearbeitung",
+    body: `Sehr geehrte Damen und Herren,
+
+zu meinem Antrag {{reference}} vom {{sentDate}} haben Sie den Eingang bestätigt, eine abschliessende Antwort steht jedoch aus. Bitte teilen Sie mir den Stand der Bearbeitung mit und bestätigen Sie die vollständige Erledigung.
+
+Die gesetzliche Frist endet am {{deadlineDate}}.
+
+{{SIG}}`,
+  },
+  {
+    key: "followup_status_en",
+    jurisdiction: "gdpr",
+    kind: "followup",
+    requestType: null,
+    language: "en",
+    name: "Reply: ask for status – English",
+    subject: "Re: Request {{reference}} – status",
+    body: `Dear Data Protection Officer,
+
+You acknowledged receipt of my request {{reference}} of {{sentDate}}, but a final response is still outstanding. Please let me know the current status and confirm full completion.
+
+The statutory deadline ends on {{deadlineDate}}.
 
 {{SIG}}`,
   },

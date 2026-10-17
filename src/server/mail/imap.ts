@@ -13,6 +13,9 @@ export type InboundMail = {
   to: string;
   subject: string;
   text: string;
+  html: string | null;
+  /** decoded text of attached originals / delivery-status parts (bounces) */
+  attachmentsText: string;
   date: Date;
   headers: Map<string, string>;
 };
@@ -40,8 +43,12 @@ export async function verifyImap(acc: MailAccount): Promise<void> {
   }
 }
 
-/** Fetch messages with UID greater than `sinceUid`. Returns messages and the highest UID seen. */
-export async function fetchNewMail(acc: MailAccount, sinceUid: number, limit = 200): Promise<{ mails: InboundMail[]; lastUid: number }> {
+/**
+ * Fetch messages with UID greater than `sinceUid`. On the very first poll (sinceUid = 0) the last
+ * `initialDays` days are ingested so replies that arrived before setup are not lost.
+ * Returns messages and the highest UID seen.
+ */
+export async function fetchNewMail(acc: MailAccount, sinceUid: number, limit = 150, initialDays = 30): Promise<{ mails: InboundMail[]; lastUid: number }> {
   const client = imapClient(acc);
   await client.connect();
   const mails: InboundMail[] = [];
@@ -51,11 +58,15 @@ export async function fetchNewMail(acc: MailAccount, sinceUid: number, limit = 2
     try {
       const status = client.mailbox;
       const uidNext = status && typeof status === "object" && "uidNext" in status ? Number(status.uidNext) : 0;
-      // First run: only look at mail from now on, don't ingest the whole mailbox history.
+      let range: string | number[] = `${sinceUid + 1}:*`;
       if (sinceUid === 0) {
-        return { mails: [], lastUid: Math.max(0, uidNext - 1) };
+        // First run: ingest recent history instead of starting from "now".
+        const since = new Date(Date.now() - initialDays * 86400000);
+        const uids = (await client.search({ since }, { uid: true })) || [];
+        lastUid = Math.max(0, uidNext - 1);
+        if (uids.length === 0) return { mails: [], lastUid };
+        range = uids.slice(-limit);
       }
-      const range = `${sinceUid + 1}:*`;
       let count = 0;
       for await (const msg of client.fetch(range, { uid: true, source: true }, { uid: true })) {
         if (msg.uid <= sinceUid) continue; // "*" may return the last message again
@@ -74,7 +85,13 @@ export async function fetchNewMail(acc: MailAccount, sinceUid: number, limit = 2
           from: parsed.from?.text ?? "",
           to: Array.isArray(parsed.to) ? parsed.to.map((t) => t.text).join(", ") : parsed.to?.text ?? "",
           subject: parsed.subject ?? "",
-          text: parsed.text ?? (parsed.html ? String(parsed.html).replace(/<[^>]+>/g, " ") : ""),
+          text: parsed.text ?? (parsed.html ? String(parsed.html).replace(/<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ") : ""),
+          html: parsed.html ? String(parsed.html) : null,
+          attachmentsText: (parsed.attachments ?? [])
+            .filter((a) => /message\/|delivery-status|text\//i.test(a.contentType) && a.size < 200_000)
+            .map((a) => a.content.toString("utf8"))
+            .join("\n")
+            .slice(0, 100_000),
           date: parsed.date ?? new Date(),
           headers,
         });

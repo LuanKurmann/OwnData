@@ -1,0 +1,1 @@
+ALTER TABLE `brokers` ADD `preferred_channel` text DEFAULT 'email' NOT NULL;

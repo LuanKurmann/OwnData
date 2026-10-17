@@ -5,15 +5,18 @@ import { getCurrentUser } from "@/lib/auth";
 import NavLinks, { type NavItem } from "@/components/NavLinks";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import { logoutAction } from "./actions";
+import { unmatchedCount } from "@/server/inbox";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const t = await getTranslations("nav");
+  const open = await unmatchedCount(user.id);
   const items: NavItem[] = [
     { key: "dashboard", href: "/dashboard", label: t("dashboard") },
     { key: "brokers", href: "/brokers", label: t("brokers") },
     { key: "requests", href: "/requests", label: t("requests") },
+    { key: "inbox", href: "/inbox", label: t("inbox"), badge: open },
     { key: "profile", href: "/profile", label: t("profile") },
     { key: "mail", href: "/settings/mail", label: t("mail") },
     { key: "templates", href: "/templates", label: t("templates") },

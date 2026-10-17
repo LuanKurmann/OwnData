@@ -3,7 +3,7 @@ import { BROKER_CATEGORIES, JURISDICTIONS, type Broker } from "@/db/schema";
 import SubmitButton from "@/components/SubmitButton";
 import { saveBrokerAction } from "./actions";
 
-type Prefill = Partial<Pick<Broker, "name" | "website" | "privacyEmail" | "privacyUrl" | "optOutUrl" | "country" | "jurisdiction" | "category" | "language" | "requiresIdVerification" | "notes" | "dataUrls">> & { id?: number };
+type Prefill = Partial<Pick<Broker, "name" | "website" | "privacyEmail" | "privacyUrl" | "optOutUrl" | "country" | "jurisdiction" | "category" | "language" | "requiresIdVerification" | "preferredChannel" | "notes" | "dataUrls">> & { id?: number };
 
 export default async function BrokerForm({ b, emails = [] }: { b: Prefill; emails?: string[] }) {
   const t = await getTranslations("brokers");
@@ -68,9 +68,18 @@ export default async function BrokerForm({ b, emails = [] }: { b: Prefill; email
           </select>
         </div>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="requiresIdVerification" defaultChecked={b.requiresIdVerification ?? false} /> {t("requiresId")}
-      </label>
+      <div className="flex flex-wrap items-center gap-6">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="requiresIdVerification" defaultChecked={b.requiresIdVerification ?? false} /> {t("requiresId")}
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          {t("channel")}
+          <select name="preferredChannel" className="input w-auto" defaultValue={b.preferredChannel ?? "email"}>
+            <option value="email">{t("channelEmail")}</option>
+            <option value="form">{t("channelForm")}</option>
+          </select>
+        </label>
+      </div>
       <div>
         <label className="label" htmlFor="dataUrls">{t("dataUrls")}</label>
         <textarea id="dataUrls" name="dataUrls" className="input" rows={3} defaultValue={b.dataUrls ?? ""} />

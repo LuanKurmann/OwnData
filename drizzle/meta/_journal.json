@@ -15,6 +15,20 @@
       "when": 1792176483732,
       "tag": "0001_omniscient_starjammers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1792238362706,
+      "tag": "0002_secret_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792239016169,
+      "tag": "0003_reflective_mastermind",
+      "breakpoints": true
     }
   ]
 }

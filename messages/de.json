@@ -11,7 +11,8 @@
     "mail": "E-Mail-Konto",
     "templates": "Vorlagen",
     "logout": "Abmelden",
-    "language": "Sprache"
+    "language": "Sprache",
+    "inbox": "Posteingang"
   },
   "common": {
     "save": "Speichern",
@@ -56,7 +57,11 @@
     "invalid": "Ungültige Eingabe.",
     "discoverNone": "Keine E-Mail-Adresse auf der Website gefunden. Bitte manuell eintragen.",
     "discoverFound": "Gefunden: {email}",
-    "error": "Fehler: {error}"
+    "error": "Fehler: {error}",
+    "assigned": "Zugeordnet. Status der Anfrage aktualisiert.",
+    "ignored": "Mail ignoriert.",
+    "replySent": "Antwort gesendet.",
+    "actionResolved": "Als erledigt vermerkt, Anfrage wartet wieder auf den Broker."
   },
   "auth": {
     "login": "Anmelden",
@@ -82,7 +87,9 @@
     "reminded": "Erinnert",
     "escalation_ready": "Eskalation möglich",
     "escalated": "Eskaliert",
-    "failed": "Fehlgeschlagen"
+    "failed": "Fehlgeschlagen",
+    "action_required": "Aktion nötig",
+    "bounced": "Unzustellbar"
   },
   "type": {
     "erasure": "Löschung",
@@ -121,7 +128,8 @@
     "brokersCovered": "Broker angeschrieben",
     "ofTotal": "von {total}",
     "lastPoll": "Letzter Posteingangs-Abruf",
-    "never": "nie"
+    "never": "nie",
+    "unmatchedMails": "{count} Mail(s) im Posteingang warten auf Zuordnung"
   },
   "brokers": {
     "title": "Datenbroker",
@@ -161,7 +169,11 @@
     "deleteBroker": "Eintrag löschen",
     "deleteBrokerHint": "Löscht auch alle Anfragen an diesen Eintrag.",
     "websitePlaceholder": "z.B. example.com",
-    "foundEmails": "Gefundene Adressen"
+    "foundEmails": "Gefundene Adressen",
+    "channel": "Kanal",
+    "channelEmail": "E-Mail",
+    "channelForm": "Nur Formular",
+    "channelFormHint": "Dieser Broker bearbeitet Anfragen nur über sein Webformular oder Portal."
   },
   "requests": {
     "title": "Anfragen",
@@ -207,7 +219,31 @@
     "manualNote": "Manuelle Notiz hinzufügen",
     "addNote": "Notiz speichern",
     "idWarning": "Dieser Empfänger verlangt in der Regel einen Identitätsnachweis. Rechne mit einer Rückfrage.",
-    "resend": "Erneut senden"
+    "resend": "Erneut senden",
+    "nextSteps": "Nächste Schritte",
+    "nextStepsIntro": "Der Empfänger hat geantwortet und verlangt etwas von dir. Erledige die Punkte unten, dann markiere die Aktion als erledigt.",
+    "nextStepsUnknown": "Die Antwort konnte nicht automatisch eingestuft werden. Lies sie im Verlauf und setze den Status selbst.",
+    "linksFound": "Links aus der Antwort",
+    "actionDone": "Aktion erledigt, warte auf Broker",
+    "reply": "Antworten",
+    "replyIntro": "Antwort geht im selben Mail-Thread an den Empfänger.",
+    "replyTemplate": "Vorlage laden",
+    "replySubject": "Betreff",
+    "replyBody": "Text",
+    "sendReply": "Antwort senden",
+    "tpl_identity": "Identität ohne Ausweiskopie",
+    "tpl_info": "Angaben nachliefern",
+    "tpl_confirm": "Anfrage bestätigen",
+    "tpl_status": "Stand nachfragen",
+    "inboundMail": "Antwort",
+    "markReviewed": "Geprüft",
+    "bouncedTitle": "E-Mail konnte nicht zugestellt werden",
+    "bouncedIntro": "Die Adresse existiert nicht oder weist fremde Absender ab. Prüfe den Broker-Eintrag, korrigiere unten die Empfängeradresse und sende erneut, oder nutze das Formular des Brokers.",
+    "openForm": "Formular öffnen",
+    "openPrivacyPage": "Datenschutzseite",
+    "checkBroker": "Broker-Eintrag prüfen",
+    "brokerHasNewEmail": "Der Broker-Eintrag hat inzwischen eine andere Adresse: {email}. Sie ist unten bereits eingesetzt.",
+    "formOnlyHint": "Dieser Broker akzeptiert Anfragen in der Regel nur über sein Formular:"
   },
   "profile": {
     "title": "Mein Profil",
@@ -278,6 +314,42 @@
     "placeholders": "Verfügbare Platzhalter",
     "reset": "Auf Systemvorlage zurücksetzen",
     "editTitle": "Vorlage bearbeiten",
-    "preview": "Vorschau mit deinen Profildaten"
+    "preview": "Vorschau mit deinen Profildaten",
+    "kindFollowup": "Antwort auf Rückfrage"
+  },
+  "classification": {
+    "completed": "Erledigt",
+    "rejected": "Abgelehnt",
+    "needs_info": "Rückfrage",
+    "action_required": "Aktion nötig",
+    "acknowledged": "Eingang bestätigt",
+    "auto_reply": "Automatische Antwort",
+    "unknown": "Unklar, bitte prüfen",
+    "bounced": "Unzustellbar"
+  },
+  "hints": {
+    "verify_identity": "Identitätsnachweis verlangt",
+    "click_link": "Link anklicken",
+    "fill_form": "Formular / Portal ausfüllen",
+    "provide_info": "Zusätzliche Angaben nötig",
+    "confirm_request": "Anfrage bestätigen"
+  },
+  "inbox": {
+    "title": "Posteingang",
+    "intro": "Alle Antworten aus deinem Postfach. Automatisch zugeordnete Mails landen direkt bei der Anfrage; den Rest ordnest du hier mit einem Klick zu. Die App merkt sich den Absender für das nächste Mal.",
+    "poll": "Postfach abrufen",
+    "tab_open": "Offen",
+    "tab_matched": "Zugeordnet",
+    "tab_ignored": "Ignoriert",
+    "empty_open": "Keine offenen Mails. Alles ist zugeordnet.",
+    "empty_matched": "Noch keine zugeordneten Mails.",
+    "empty_ignored": "Keine ignorierten Mails.",
+    "showBody": "Nachricht anzeigen",
+    "assignTo": "Anfrage auswählen…",
+    "assign": "Zuordnen",
+    "learn": "Absender merken",
+    "learnHint": "Künftige Mails von dieser Adresse/Domain werden automatisch diesem Broker zugeordnet.",
+    "ignore": "Ignorieren",
+    "unignore": "Wiederherstellen"
   }
 }

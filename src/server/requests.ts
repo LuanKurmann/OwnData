@@ -26,6 +26,13 @@ export function reminderKey(lang: "de" | "en") {
   return `reminder_${lang}`;
 }
 
+export const FOLLOWUP_KINDS = ["identity", "info", "confirm", "status"] as const;
+export type FollowupKind = (typeof FOLLOWUP_KINDS)[number];
+
+export function followupKey(kind: FollowupKind, lang: "de" | "en") {
+  return `followup_${kind}_${lang}`;
+}
+
 export function escalationKey(j: Jurisdiction, lang: "de" | "en") {
   if (j === "dsg") return "escalation_dsg_de";
   if (j === "ccpa") return "escalation_ccpa_en";

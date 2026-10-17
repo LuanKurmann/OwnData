@@ -32,6 +32,37 @@ function imapClient(acc: MailAccount) {
   });
 }
 
+const SENT_CANDIDATES = ["Sent", "Sent Items", "Sent Messages", "Gesendet", "Gesendete Elemente", "Gesendete Objekte", "INBOX.Sent", "INBOX/Sent", "[Gmail]/Sent Mail", "[Gmail]/Gesendet"];
+
+/** Find the folder flagged \Sent (or a common name). Returns null when none exists. */
+export async function detectSentMailbox(acc: MailAccount): Promise<string | null> {
+  const client = imapClient(acc);
+  await client.connect();
+  try {
+    const boxes = await client.list();
+    const special = boxes.find((b) => b.specialUse === "\\Sent");
+    if (special) return special.path;
+    const byName = boxes.find((b) => SENT_CANDIDATES.some((c) => c.toLowerCase() === b.path.toLowerCase()));
+    return byName?.path ?? null;
+  } finally {
+    await client.logout().catch(() => undefined);
+  }
+}
+
+/** Store a copy of an outgoing message in the account's Sent folder (configured or auto-detected). */
+export async function appendToSent(acc: MailAccount, raw: Buffer): Promise<string> {
+  const folder = acc.imapSentMailbox || (await detectSentMailbox(acc));
+  if (!folder) throw new Error("no Sent folder found");
+  const client = imapClient(acc);
+  await client.connect();
+  try {
+    await client.append(folder, raw, ["\\Seen"], new Date());
+    return folder;
+  } finally {
+    await client.logout().catch(() => undefined);
+  }
+}
+
 export async function verifyImap(acc: MailAccount): Promise<void> {
   const client = imapClient(acc);
   await client.connect();

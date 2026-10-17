@@ -16,8 +16,10 @@ import { daysUntil, fmtDate, fmtDateTime } from "@/lib/format";
 import Flash from "@/components/Flash";
 import StatusBadge from "@/components/StatusBadge";
 import SubmitButton from "@/components/SubmitButton";
+import { deleteRequestAction, formSubmittedAction, queueAction, reminderAction, replyAction, resolveActionAction, saveNotesAction, setStatusAction, updateDraftAction } from "../actions";
+import EventLabel from "@/components/EventLabel";
 import CopyButton from "@/components/CopyButton";
-import { deleteRequestAction, queueAction, reminderAction, replyAction, resolveActionAction, saveNotesAction, setStatusAction, updateDraftAction } from "../actions";
+import { describeAddress } from "@/lib/address";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // mail sending / IMAP polling inside server actions (Vercel)
@@ -40,7 +42,7 @@ export default async function RequestDetailPage({ params, searchParams }: { para
     ...outMsgs.map((m) => ({ kind: "out" as const, at: m.occurredAt, msg: m })),
     ...inMails.map((m) => ({ kind: "in" as const, at: m.receivedAt, mail: m })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());
-  const latestIn = inMails.filter((m) => m.classification !== "auto_reply").at(-1) ?? null;
+  const latestIn = inMails.filter((m) => !["auto_reply", "bounced"].includes(m.classification) && m.fromAddr !== "owndata").at(-1) ?? null;
   const th = await getTranslations("hints");
   const t = await getTranslations("requests");
   const tt = await getTranslations("type");
@@ -49,6 +51,16 @@ export default async function RequestDetailPage({ params, searchParams }: { para
   const locale = await getLocale();
   const profile = await getProfile(user.id);
   const acc = await getMailAccount(user.id);
+  const activity = await db.select().from(schema.activityLog).where(eq(schema.activityLog.requestId, req.id)).orderBy(asc(schema.activityLog.createdAt)).all();
+  const formOnly = broker.preferredChannel === "form" && !!broker.optOutUrl;
+  const formData = [
+    `${profile.fullName}`,
+    profile.birthDate ? `${profile.birthDate}` : "",
+    ...profile.addressList.map((a) => describeAddress(a, req.language)),
+    ...profile.emails.split(/\r?\n/).filter(Boolean),
+    ...profile.phones.split(/\r?\n/).filter(Boolean),
+    ...(broker.dataUrls ? broker.dataUrls.split(/\r?\n/).filter(Boolean) : []),
+  ].filter(Boolean);
 
   const editable = ["draft", "failed", "queued", "bounced"].includes(req.status);
   const canRemind = ["sent", "acknowledged", "overdue", "reminded", "needs_info", "action_required", "escalation_ready"].includes(req.status) && !!acc;
@@ -178,6 +190,28 @@ export default async function RequestDetailPage({ params, searchParams }: { para
         </form>
       ) : null}
 
+      {/* Form-only broker: data to paste + "submitted" button */}
+      {formOnly && !["completed", "rejected", "escalated"].includes(req.status) && !req.formSubmittedAt ? (
+        <div className="card mb-6 border-amber-200 dark:border-amber-900">
+          <h2 className="font-semibold">{t("formTitle")}</h2>
+          <p className="mt-1 text-sm text-slate-500">{t("formIntro")}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a href={broker.optOutUrl} target="_blank" rel="noreferrer noopener" className="btn-primary"><ExternalLink className="h-4 w-4" /> {t("openForm")}</a>
+            <CopyButton text={formData.join("\n")} />
+            <CopyButton text={req.body} className="btn-secondary" />
+          </div>
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs text-slate-500">{t("formDataPreview")}</summary>
+            <pre className="pre mt-2">{formData.join("\n")}</pre>
+          </details>
+          <form action={formSubmittedAction} className="mt-3">
+            <input type="hidden" name="id" value={req.id} />
+            <SubmitButton className="btn-secondary">{t("formSubmitted")}</SubmitButton>
+          </form>
+        </div>
+      ) : null}
+      {req.formSubmittedAt ? <p className="mb-4 text-xs text-slate-500">{t("formSubmittedAt", { when: fmtDateTime(req.formSubmittedAt, locale) })}</p> : null}
+
       {/* Next steps */}
       {showNextSteps && latestIn ? (
         <div className="card mb-6 border-amber-200 dark:border-amber-900">
@@ -198,8 +232,8 @@ export default async function RequestDetailPage({ params, searchParams }: { para
               <div className="mb-1 text-xs uppercase tracking-wide text-slate-500">{t("linksFound")}</div>
               <div className="flex flex-wrap gap-1.5">
                 {parseLinks(latestIn).slice(0, 6).map((l) => (
-                  <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary px-2 py-1 text-xs" title={l.url}>
-                    <ExternalLink className="h-3 w-3" /> {l.label}
+                  <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary max-w-full px-2 py-1 text-xs" title={l.url}>
+                    <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">{l.label}</span>
                   </a>
                 ))}
               </div>
@@ -240,9 +274,9 @@ export default async function RequestDetailPage({ params, searchParams }: { para
                   <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <span className="badge bg-slate-100 dark:bg-slate-800">{t("out")} · {item.msg.kind}</span>
                     <span>{fmtDateTime(item.msg.occurredAt, locale)}</span>
-                    <span className="truncate">→ {item.msg.toAddr}</span>
+                    <span className="break-anywhere">→ {item.msg.toAddr}</span>
                   </div>
-                  <div className="text-sm font-medium">{item.msg.subject}</div>
+                  <div className="break-anywhere text-sm font-medium">{item.msg.subject}</div>
                   <details className="mt-1">
                     <summary className="cursor-pointer text-xs text-slate-500">{t("body")}</summary>
                     <pre className="pre mt-2">{item.msg.body}</pre>
@@ -253,19 +287,19 @@ export default async function RequestDetailPage({ params, searchParams }: { para
                   <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                     <span className="badge bg-slate-100 dark:bg-slate-800">{t("in")}</span>
                     <span>{fmtDateTime(item.mail.receivedAt, locale)}</span>
-                    <span className="truncate">← {item.mail.fromAddr}</span>
+                    <span className="break-anywhere">← {item.mail.fromAddr}</span>
                     <ClassificationBadge value={item.mail.classification} />
                     {item.mail.handledAt ? <span className="badge bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">✓</span> : null}
                   </div>
-                  <div className="text-sm font-medium">{item.mail.subject}</div>
+                  <div className="break-anywhere text-sm font-medium">{item.mail.subject}</div>
                   <details className="mt-1">
                     <summary className="cursor-pointer text-xs text-slate-500">{t("body")}</summary>
                     <pre className="pre mt-2">{item.mail.body}</pre>
                     {parseLinks(item.mail).length ? (
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {parseLinks(item.mail).slice(0, 6).map((l) => (
-                          <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary px-2 py-1 text-xs" title={l.url}>
-                            <ExternalLink className="h-3 w-3" /> {l.label}
+                          <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary max-w-full px-2 py-1 text-xs" title={l.url}>
+                            <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">{l.label}</span>
                           </a>
                         ))}
                       </div>
@@ -276,6 +310,28 @@ export default async function RequestDetailPage({ params, searchParams }: { para
             )}
           </ol>
         )}
+      </div>
+
+      {/* Timeline */}
+      <div className="card mb-6">
+        <h2 className="mb-3 font-semibold">{t("timeline")}</h2>
+        <ol className="relative ml-2 border-l border-slate-200 pl-4 dark:border-slate-800">
+          <li className="mb-3 text-sm">
+            <span className="absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full bg-slate-300 dark:bg-slate-600" />
+            <span className="text-xs text-slate-500">{fmtDateTime(req.createdAt, locale)}</span>
+            <div><EventLabel event="request.drafted" /></div>
+          </li>
+          {activity.map((a) => (
+            <li key={a.id} className="mb-3 text-sm">
+              <span className={`absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full ${a.level === "error" ? "bg-red-500" : a.level === "warn" ? "bg-amber-400" : a.event.startsWith("auto.") ? "bg-violet-400" : "bg-brand-500"}`} />
+              <span className="text-xs text-slate-500">{fmtDateTime(a.createdAt, locale)}</span>
+              <div className="flex flex-wrap items-baseline gap-2">
+                <EventLabel event={a.event} />
+                {a.detail ? <span className="break-anywhere min-w-0 text-xs text-slate-500">{a.detail}</span> : null}
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
 
       {/* Reply composer */}

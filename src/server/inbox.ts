@@ -5,19 +5,12 @@ import type { ActionHint, Classification, InboxMail, Request } from "@/db/schema
 import { REFERENCE_REGEX } from "@/lib/reference";
 import { classifyReply, extractBounceInfo, extractLinks, isAutoReply, isBounce, stripQuoted } from "@/lib/classify";
 import type { InboundMail } from "./mail/imap";
+import { brokerTokens, domainsRelated, emailAddress, emailDomain } from "@/lib/match";
 
 const OPEN_STATUSES = ["sent", "acknowledged", "needs_info", "action_required", "overdue", "reminded", "escalation_ready"] as const;
 const TERMINAL = ["completed", "rejected", "escalated"];
 const GENERIC_DOMAINS = /(^|\.)(gmail|googlemail|outlook|hotmail|live|yahoo|gmx|web|icloud|me|proton|protonmail|bluewin|sunrise|hispeed|t-online|aol)\.[a-z.]+$/i;
 
-export function emailAddress(from: string): string {
-  const m = from.match(/<([^>]+)>/);
-  return (m ? m[1] : from).trim().toLowerCase();
-}
-
-export function emailDomain(addr: string): string {
-  return addr.split("@")[1]?.toLowerCase() ?? "";
-}
 
 async function log(userId: number, requestId: number | null, event: string, detail = "", level: "info" | "warn" | "error" = "info") {
   await (await getDb()).insert(schema.activityLog).values({ userId, requestId, event, detail, level }).run();
@@ -69,32 +62,24 @@ export async function matchRequest(userId: number, mail: { inReplyTo: string | n
     const byDomain = open.filter(({ req, brokerWebsite }) => {
       const d = emailDomain(req.toEmail.toLowerCase());
       const w = brokerWebsite.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0].toLowerCase();
-      return [d, w].filter(Boolean).some((x) => x === domain || domain.endsWith("." + x) || x.endsWith("." + domain) || rootDomain(x) === rootDomain(domain));
+      return domainsRelated(domain, [d, w]);
     });
-    if (byDomain.length === 1) return byDomain[0].req;
+    const pick = uniqueBroker(byDomain);
+    if (pick) return pick;
   }
   // 5) broker name appears in the sender name or subject (ticket systems like Zendesk/OneTrust send from foreign domains)
   const hay = `${mail.from} ${mail.subject}`.toLowerCase();
   const byName = open.filter(({ brokerName }) => brokerTokens(brokerName).some((tok) => hay.includes(tok)));
-  if (byName.length === 1) return byName[0].req;
-  return null;
+  return uniqueBroker(byName);
 }
 
-function rootDomain(host: string): string {
-  const parts = host.split(".");
-  return parts.length <= 2 ? host : parts.slice(-2).join(".");
+/** Several candidates are fine when they all belong to the same broker: take the most recently updated one. */
+function uniqueBroker(cands: Array<{ req: Request; brokerName: string; brokerWebsite: string }>): Request | null {
+  if (cands.length === 0) return null;
+  if (new Set(cands.map((c) => c.req.brokerId)).size !== 1) return null;
+  return [...cands].sort((a, b) => b.req.updatedAt.getTime() - a.req.updatedAt.getTime())[0].req;
 }
 
-const GENERIC_TOKENS = new Set(["gmbh", "inc", "llc", "ltd", "corp", "group", "holding", "services", "service", "data", "digital", "media", "online", "privacy", "information", "solutions", "consumer", "credit", "check", "schweiz", "deutschland", "germany", "europe", "international", "the", "und", "and", "ehem", "formerly"]);
-
-/** Distinctive name tokens of a broker, e.g. "localsearch (local.ch / search.ch)" -> ["localsearch", "local.ch", "search.ch"]. */
-export function brokerTokens(name: string): string[] {
-  return name
-    .toLowerCase()
-    .split(/[\s,()\/&]+/)
-    .map((t) => t.replace(/[^a-z0-9.-]/g, ""))
-    .filter((t) => t.length >= 4 && !GENERIC_TOKENS.has(t) && !/^\d+$/.test(t));
-}
 
 async function latestRequestForBroker(userId: number, brokerId: number): Promise<Request | null> {
   const db = await getDb();
@@ -107,8 +92,31 @@ async function latestRequestForBroker(userId: number, brokerId: number): Promise
   return rows.find((r) => (OPEN_STATUSES as readonly string[]).includes(r.status)) ?? rows[0] ?? null;
 }
 
+export type IngestOptions = { autoResend?: boolean };
+
+/** Create the "fill in the broker's form" action for a request (used for form-only brokers and after bounces). */
+export async function addFormAction(userId: number, requestId: number, broker: { name: string; optOutUrl: string }) {
+  const db = await getDb();
+  await db
+    .insert(schema.inbox)
+    .values({
+      userId,
+      requestId,
+      status: "matched",
+      fromAddr: "owndata",
+      fromName: "OwnData",
+      toAddr: "",
+      subject: broker.name,
+      body: "",
+      links: JSON.stringify([{ url: broker.optOutUrl, label: broker.optOutUrl.replace(/^https?:\/\//, "").slice(0, 60) }]),
+      classification: "action_required",
+      hints: JSON.stringify(["fill_form"]),
+    })
+    .run();
+}
+
 /** Store an inbound mail (deduplicated by Message-ID) and try to match it. Returns the inbox row and whether it matched. */
-export async function ingestMail(userId: number, mail: InboundMail, ownAddress: string): Promise<{ row: InboxMail | null; matched: boolean; duplicate: boolean }> {
+export async function ingestMail(userId: number, mail: InboundMail, ownAddress: string, opts: IngestOptions = {}): Promise<{ row: InboxMail | null; matched: boolean; duplicate: boolean; auto?: string }> {
   const db = await getDb();
   const from = emailAddress(mail.from);
   if (from && from === ownAddress.toLowerCase()) return { row: null, matched: false, duplicate: true };
@@ -156,12 +164,35 @@ export async function ingestMail(userId: number, mail: InboundMail, ownAddress: 
       .get();
     if (matched) {
       const now = new Date();
+      const lastError = `${info.recipients[0] ?? matched.toEmail}: ${info.diagnostic || "undeliverable"}`.slice(0, 400);
       await db
         .update(schema.requests)
-        .set({ status: TERMINAL.includes(matched.status) ? matched.status : "bounced", lastError: `${info.recipients[0] ?? matched.toEmail}: ${info.diagnostic || "undeliverable"}`.slice(0, 400), lastResponseAt: mail.date, updatedAt: now })
+        .set({ status: TERMINAL.includes(matched.status) ? matched.status : "bounced", lastError, lastResponseAt: mail.date, updatedAt: now })
         .where(eq(schema.requests.id, matched.id))
         .run();
-      await log(userId, matched.id, "request.bounced", info.diagnostic.slice(0, 200), "error");
+      await log(userId, matched.id, "request.bounced", lastError.slice(0, 200), "error");
+      // automatic recovery: the broker entry may carry a corrected address or a form by now
+      if (opts.autoResend && !TERMINAL.includes(matched.status) && matched.resendCount < 2) {
+        const broker = await db.select().from(schema.brokers).where(eq(schema.brokers.id, matched.brokerId)).get();
+        if (broker) {
+          const newEmail = broker.privacyEmail.trim().toLowerCase();
+          if (newEmail && newEmail !== matched.toEmail.toLowerCase() && broker.preferredChannel !== "form") {
+            await db
+              .update(schema.requests)
+              .set({ toEmail: newEmail, status: "queued", resendCount: matched.resendCount + 1, updatedAt: now })
+              .where(eq(schema.requests.id, matched.id))
+              .run();
+            await log(userId, matched.id, "auto.resend", `${matched.toEmail} → ${newEmail}`);
+            return { row, matched: true, duplicate: false, auto: "resend" };
+          }
+          if (broker.preferredChannel === "form" && broker.optOutUrl) {
+            await db.update(schema.requests).set({ status: "action_required", updatedAt: now }).where(eq(schema.requests.id, matched.id)).run();
+            await addFormAction(userId, matched.id, broker);
+            await log(userId, matched.id, "auto.form_fallback", broker.optOutUrl);
+            return { row, matched: true, duplicate: false, auto: "form" };
+          }
+        }
+      }
     }
     return { row, matched: !!matched, duplicate: false };
   }

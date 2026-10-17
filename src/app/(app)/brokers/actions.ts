@@ -21,7 +21,7 @@ export async function createRequestsAction(formData: FormData) {
   if (!profile.lastName && !profile.fullName) redirectFlash("/profile", "noProfile", "err");
   if (mode === "queue" && !(await getMailAccount(user.id))) redirectFlash("/settings/mail", "noMail", "err");
   const res = await createRequests({ userId: user.id, brokerIds: ids, type, queue: mode === "queue" });
-  if (sendNow && res.created.length) await runWorker(user.id);
+  if (sendNow && res.created.length) await runWorker(user.id, "send");
   revalidatePath("/requests");
   revalidatePath("/brokers");
   if (res.created.length === 0) redirectFlash("/requests", "skipped", "err", { count: res.skipped.length });

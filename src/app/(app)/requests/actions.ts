@@ -43,7 +43,7 @@ export async function queueAction(formData: FormData) {
   await (await getDb()).update(schema.requests).set({ status: "queued", lastError: null, updatedAt: new Date() }).where(eq(schema.requests.id, id)).run();
   await log(user.id, id, "request.queued");
   if (sendNow) {
-    const r = await runWorker(user.id);
+    const r = await runWorker(user.id, "send");
     revalidatePath(`/requests/${id}`);
     if (r.errors.length) redirectFlash(`/requests/${id}`, "workerErrors", "err", { errors: r.errors.join("; ").slice(0, 300) });
     redirectFlash(`/requests/${id}`, "workerDone", "ok", { sent: r.sent, reminders: r.remindersSent, inbound: r.inboundMatched, failed: r.failed });
@@ -102,7 +102,9 @@ export async function replyAction(formData: FormData) {
   if (!parsed.success) redirectFlash(`/requests/${id}`, "invalid", "err");
   const db = await getDb();
   // thread onto the latest inbound mail if there is one, else onto our original request
-  const latestIn = await db.select().from(schema.inbox).where(and(eq(schema.inbox.requestId, id), eq(schema.inbox.userId, user.id))).orderBy(desc(schema.inbox.receivedAt)).get();
+  const latestIn = (await db.select().from(schema.inbox).where(and(eq(schema.inbox.requestId, id), eq(schema.inbox.userId, user.id))).orderBy(desc(schema.inbox.receivedAt)).all()).find(
+    (m) => m.messageId && !["bounced", "auto_reply"].includes(m.classification) && m.fromAddr !== "owndata",
+  );
   const ours = await db.select({ messageId: schema.messages.messageId }).from(schema.messages).where(and(eq(schema.messages.requestId, id), eq(schema.messages.direction, "out"))).orderBy(asc(schema.messages.occurredAt)).all();
   const refs = ours.map((m) => m.messageId).filter((x): x is string => !!x);
   const inReplyTo = latestIn?.messageId ?? refs[0] ?? null;
@@ -143,6 +145,26 @@ export async function resolveActionAction(formData: FormData) {
   await log(user.id, id, "action.resolved");
   revalidatePath(`/requests/${id}`);
   redirectFlash(`/requests/${id}`, "actionResolved");
+}
+
+/** The user filled in the broker's web form: start the deadline as if the request was sent. */
+export async function formSubmittedAction(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const { user, req } = await ownRequest(id);
+  const db = await getDb();
+  const now = new Date();
+  const { LEGAL } = await import("@/lib/legal");
+  const days = LEGAL[req.jurisdiction].deadlineDays[req.type];
+  await db
+    .update(schema.requests)
+    .set({ status: "sent", formSubmittedAt: now, sentAt: req.sentAt ?? now, deadlineAt: new Date(now.getTime() + days * 86400000), updatedAt: now })
+    .where(eq(schema.requests.id, id))
+    .run();
+  const open = await db.select({ id: schema.inbox.id }).from(schema.inbox).where(and(eq(schema.inbox.requestId, id), eq(schema.inbox.userId, user.id))).all();
+  for (const m of open) await markHandled(user.id, m.id);
+  await log(user.id, id, "request.form_submitted");
+  revalidatePath(`/requests/${id}`);
+  redirectFlash(`/requests/${id}`, "formSubmitted");
 }
 
 export async function deleteRequestAction(formData: FormData) {

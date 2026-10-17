@@ -111,10 +111,16 @@ export const mailAccounts = sqliteTable("mail_accounts", {
   imapUser: text("imap_user").notNull().default(""),
   imapPassEnc: text("imap_pass_enc").notNull().default(""),
   imapMailbox: text("imap_mailbox").notNull().default("INBOX"),
+  /** IMAP folder that receives a copy of every sent mail; auto-detected (\Sent) when empty */
+  imapSentMailbox: text("imap_sent_mailbox").notNull().default(""),
   imapLastUid: integer("imap_last_uid").notNull().default(0),
   imapLastPollAt: integer("imap_last_poll_at", { mode: "timestamp" }),
   imapLastError: text("imap_last_error"),
   smtpLastError: text("smtp_last_error"),
+  /** automation switches */
+  autoFollowup: integer("auto_followup", { mode: "boolean" }).notNull().default(true),
+  autoConfirmLinks: integer("auto_confirm_links", { mode: "boolean" }).notNull().default(true),
+  autoResend: integer("auto_resend", { mode: "boolean" }).notNull().default(true),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().default(now),
 });
 
@@ -187,6 +193,11 @@ export const requests = sqliteTable(
     lastResponseAt: integer("last_response_at", { mode: "timestamp" }),
     closedAt: integer("closed_at", { mode: "timestamp" }),
     autoRemind: integer("auto_remind", { mode: "boolean" }).notNull().default(true),
+    /** set once an automatic follow-up (identity/info) was sent, to avoid loops */
+    autoFollowupAt: integer("auto_followup_at", { mode: "timestamp" }),
+    /** set when the user (or the app) submitted the broker's web form */
+    formSubmittedAt: integer("form_submitted_at", { mode: "timestamp" }),
+    resendCount: integer("resend_count").notNull().default(0),
     lastError: text("last_error"),
     notes: text("notes").notNull().default(""),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().default(now),
@@ -268,6 +279,27 @@ export const senderRules = sqliteTable(
   (t) => [index("sender_rules_user_idx").on(t.userId, t.pattern)],
 );
 
+/** One row per worker run (cron, manual, after sending) for traceability. */
+export const workerRuns = sqliteTable(
+  "worker_runs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id, { onDelete: "cascade" }),
+    trigger: text("trigger", { enum: ["cron", "manual", "send", "scheduler", "api"] }).notNull().default("manual"),
+    startedAt: integer("started_at", { mode: "timestamp" }).notNull().default(now),
+    finishedAt: integer("finished_at", { mode: "timestamp" }),
+    sent: integer("sent").notNull().default(0),
+    failed: integer("failed").notNull().default(0),
+    inboundMatched: integer("inbound_matched").notNull().default(0),
+    inboundUnmatched: integer("inbound_unmatched").notNull().default(0),
+    remindersSent: integer("reminders_sent").notNull().default(0),
+    autoActions: integer("auto_actions").notNull().default(0),
+    overdueMarked: integer("overdue_marked").notNull().default(0),
+    errors: text("errors").notNull().default("[]"),
+  },
+  (t) => [index("worker_runs_started_idx").on(t.startedAt)],
+);
+
 export const activityLog = sqliteTable(
   "activity_log",
   {
@@ -292,6 +324,8 @@ export type Template = typeof templates.$inferSelect;
 export type Request = typeof requests.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type InboxMail = typeof inbox.$inferSelect;
+export type WorkerRun = typeof workerRuns.$inferSelect;
+export type ActivityEntry = typeof activityLog.$inferSelect;
 export type SenderRule = typeof senderRules.$inferSelect;
 export type ExtractedLink = { url: string; label: string };
 export type ActionHint = "verify_identity" | "click_link" | "fill_form" | "provide_info" | "confirm_request";

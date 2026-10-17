@@ -12,7 +12,8 @@
     "templates": "Templates",
     "logout": "Log out",
     "language": "Language",
-    "inbox": "Inbox"
+    "inbox": "Inbox",
+    "activity": "Activity"
   },
   "common": {
     "save": "Save",
@@ -61,7 +62,10 @@
     "assigned": "Assigned. Request status updated.",
     "ignored": "Mail ignored.",
     "replySent": "Reply sent.",
-    "actionResolved": "Marked as done, request is waiting for the broker again."
+    "actionResolved": "Marked as done, request is waiting for the broker again.",
+    "sentDetected": "Sent folder detected: {folder}",
+    "sentNotFound": "No Sent folder found. Please enter the name manually.",
+    "formSubmitted": "Form marked as submitted, deadline running."
   },
   "auth": {
     "login": "Log in",
@@ -129,7 +133,9 @@
     "ofTotal": "of {total}",
     "lastPoll": "Last inbox poll",
     "never": "never",
-    "unmatchedMails": "{count} mail(s) in the inbox waiting to be assigned"
+    "unmatchedMails": "{count} mail(s) in the inbox waiting to be assigned",
+    "lastRun": "Last run {when}: {sent} sent, {inbound} replies, {auto} automatic",
+    "allActivity": "Full log"
   },
   "brokers": {
     "title": "Data brokers",
@@ -243,7 +249,13 @@
     "openPrivacyPage": "Privacy page",
     "checkBroker": "Check broker entry",
     "brokerHasNewEmail": "The broker entry now has a different address: {email}. It is already filled in below.",
-    "formOnlyHint": "This broker usually accepts requests only through its form:"
+    "formOnlyHint": "This broker usually accepts requests only through its form:",
+    "timeline": "Timeline",
+    "formTitle": "Fill in the broker's form",
+    "formIntro": "This broker only processes requests through its web form. Open the form, paste your data (copy button) and then mark “Form submitted”. The deadline starts and replies are tracked.",
+    "formDataPreview": "Show data for the form",
+    "formSubmitted": "Form submitted",
+    "formSubmittedAt": "Form submitted on {when}."
   },
   "profile": {
     "title": "My profile",
@@ -298,7 +310,30 @@
     "lastError": "Last error",
     "lastPoll": "Last poll",
     "hint": "Tip: use a dedicated address such as privacy@yourdomain.com so replies arrive in one place. For Gmail use an app password; for Proton use Proton Bridge.",
-    "notConfigured": "No mail account configured yet."
+    "notConfigured": "No mail account configured yet.",
+    "sentMailbox": "Folder for sent mail",
+    "sentMailboxAuto": "automatic (\\\\Sent)",
+    "sentMailboxHint": "Every sent request, reminder and reply is also copied via IMAP into this folder so it shows up under “Sent” in your mail client. Leave empty for auto-detection.",
+    "detectSent": "Detect Sent folder",
+    "automation": "Automation",
+    "automationIntro": "What the app does without you. Every automatic action appears in the request timeline.",
+    "autoFollowup": "Answer follow-up questions automatically",
+    "autoFollowupHint": "When a broker asks for proof of identity or additional details (without insisting on a form), the app sends the matching reply template once, in the same thread.",
+    "autoConfirmLinks": "Open confirmation links automatically",
+    "autoConfirmLinksHint": "When a reply contains a “please confirm your request” link, the app opens it server-side and records the page's response.",
+    "autoResend": "Resend automatically after a bounce",
+    "autoResendHint": "When a mail bounces and the broker entry meanwhile has a different address, the request is resent there (max. 2 times). If the broker is now “form only”, the request becomes a form task.",
+    "runStarted": "Run",
+    "runTrigger": "Trigger",
+    "runSent": "Sent",
+    "runInbound": "Inbound matched / open",
+    "runAuto": "Automatic",
+    "runErrors": "Errors",
+    "trigger_cron": "Cron",
+    "trigger_manual": "Manual",
+    "trigger_send": "Send",
+    "trigger_scheduler": "Schedule",
+    "trigger_api": "API"
   },
   "templates": {
     "title": "Templates",
@@ -351,5 +386,42 @@
     "learnHint": "Future mails from this address/domain are matched to this broker automatically.",
     "ignore": "Ignore",
     "unignore": "Restore"
+  },
+  "activity": {
+    "title": "Activity",
+    "intro": "Complete log: every send, every reply, every automatic action with a timestamp.",
+    "when": "When",
+    "event": "Event",
+    "request": "Request",
+    "detail": "Details",
+    "empty": "No entries yet.",
+    "warnOnly": "Warnings only",
+    "errorOnly": "Errors only"
+  },
+  "events": {
+    "request_drafted": "Request created",
+    "request_queued": "Queued for sending",
+    "request_sent": "E-mail sent",
+    "request_failed": "Sending failed",
+    "request_bounced": "E-mail bounced",
+    "request_overdue": "Deadline passed",
+    "request_escalation_ready": "Ready to escalate",
+    "request_status": "Status changed",
+    "request_edited": "Draft edited",
+    "request_form_only": "Form task created (broker does not accept e-mail)",
+    "request_form_submitted": "Form submitted",
+    "reminder_sent": "Reminder sent",
+    "reminder_failed": "Reminder failed",
+    "reply_received": "Reply received",
+    "reply_sent": "Reply sent",
+    "inbox_assigned": "Mail assigned manually",
+    "action_resolved": "Action marked as done",
+    "imap_failed": "Inbox poll failed",
+    "auto_followup": "Automatic reply sent",
+    "auto_followup_failed": "Automatic reply failed",
+    "auto_confirm": "Confirmation link opened automatically",
+    "auto_confirm_failed": "Confirmation link could not be confirmed",
+    "auto_resend": "Automatically resent to corrected address",
+    "auto_form_fallback": "Automatically converted to form task"
   }
 }

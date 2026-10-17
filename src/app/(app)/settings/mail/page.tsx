@@ -5,7 +5,9 @@ import type { SearchParams } from "@/lib/flash";
 import { fmtDateTime } from "@/lib/format";
 import Flash from "@/components/Flash";
 import SubmitButton from "@/components/SubmitButton";
-import { saveMailAction, testImapAction, testSmtpAction } from "./actions";
+import { detectSentAction, saveMailAction, testImapAction, testSmtpAction } from "./actions";
+import { desc, eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { runWorkerAction } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,7 @@ export default async function MailSettingsPage({ searchParams }: { searchParams:
   const t = await getTranslations("mail");
   const tc = await getTranslations("common");
   const locale = await getLocale();
+  const runs = await (await getDb()).select().from(schema.workerRuns).where(eq(schema.workerRuns.userId, user.id)).orderBy(desc(schema.workerRuns.startedAt)).limit(10).all();
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-semibold">{t("title")}</h1>
@@ -95,6 +98,26 @@ export default async function MailSettingsPage({ searchParams }: { searchParams:
             <input id="imapMailbox" name="imapMailbox" className="input" defaultValue={acc?.imapMailbox ?? "INBOX"} />
           </div>
         </div>
+        <div>
+          <label className="label" htmlFor="imapSentMailbox">{t("sentMailbox")}</label>
+          <input id="imapSentMailbox" name="imapSentMailbox" className="input md:w-80" defaultValue={acc?.imapSentMailbox ?? ""} placeholder={t("sentMailboxAuto")} />
+          <p className="help">{t("sentMailboxHint")}</p>
+        </div>
+
+        <h2 className="mt-2 font-semibold">{t("automation")}</h2>
+        <p className="text-xs text-slate-500">{t("automationIntro")}</p>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="autoFollowup" className="mt-1" defaultChecked={acc?.autoFollowup ?? true} />
+          <span>{t("autoFollowup")}<span className="block text-xs text-slate-500">{t("autoFollowupHint")}</span></span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="autoConfirmLinks" className="mt-1" defaultChecked={acc?.autoConfirmLinks ?? true} />
+          <span>{t("autoConfirmLinks")}<span className="block text-xs text-slate-500">{t("autoConfirmLinksHint")}</span></span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="autoResend" className="mt-1" defaultChecked={acc?.autoResend ?? true} />
+          <span>{t("autoResend")}<span className="block text-xs text-slate-500">{t("autoResendHint")}</span></span>
+        </label>
         {acc?.imapLastError ? <p className="text-xs text-red-600">{t("lastError")}: {acc.imapLastError}</p> : null}
         {acc ? <p className="text-xs text-slate-500">{t("lastPoll")}: {fmtDateTime(acc.imapLastPollAt, locale)}</p> : null}
 
@@ -106,10 +129,33 @@ export default async function MailSettingsPage({ searchParams }: { searchParams:
         <div className="mt-4 flex flex-wrap gap-2">
           <form action={testSmtpAction}><SubmitButton className="btn-secondary">{t("testSmtp")}</SubmitButton></form>
           <form action={testImapAction}><SubmitButton className="btn-secondary">{t("testImap")}</SubmitButton></form>
+          <form action={detectSentAction}><SubmitButton className="btn-secondary">{t("detectSent")}</SubmitButton></form>
           <form action={runWorkerAction}>
             <input type="hidden" name="back" value="/settings/mail" />
             <SubmitButton className="btn-secondary">{tc("runWorker")}</SubmitButton>
           </form>
+        </div>
+      ) : null}
+      {runs.length ? (
+        <div className="card mt-6 overflow-x-auto p-0">
+          <table className="table">
+            <thead><tr><th>{t("runStarted")}</th><th>{t("runTrigger")}</th><th>{t("runSent")}</th><th>{t("runInbound")}</th><th>{t("runAuto")}</th><th>{t("runErrors")}</th></tr></thead>
+            <tbody>
+              {runs.map((r) => {
+                const errs: string[] = JSON.parse(r.errors || "[]");
+                return (
+                  <tr key={r.id}>
+                    <td className="whitespace-nowrap">{fmtDateTime(r.startedAt, locale)}</td>
+                    <td>{t(`trigger_${r.trigger}`)}</td>
+                    <td>{r.sent}{r.remindersSent ? ` (+${r.remindersSent})` : ""}{r.failed ? <span className="text-red-600"> · {r.failed} ✗</span> : null}</td>
+                    <td>{r.inboundMatched}{r.inboundUnmatched ? ` / ${r.inboundUnmatched}` : ""}</td>
+                    <td>{r.autoActions}</td>
+                    <td className="max-w-xs truncate text-xs text-red-600" title={errs.join("\n")}>{errs.length ? errs[0] : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       ) : null}
     </div>

@@ -12,7 +12,8 @@
     "templates": "Vorlagen",
     "logout": "Abmelden",
     "language": "Sprache",
-    "inbox": "Posteingang"
+    "inbox": "Posteingang",
+    "activity": "Aktivität"
   },
   "common": {
     "save": "Speichern",
@@ -61,7 +62,10 @@
     "assigned": "Zugeordnet. Status der Anfrage aktualisiert.",
     "ignored": "Mail ignoriert.",
     "replySent": "Antwort gesendet.",
-    "actionResolved": "Als erledigt vermerkt, Anfrage wartet wieder auf den Broker."
+    "actionResolved": "Als erledigt vermerkt, Anfrage wartet wieder auf den Broker.",
+    "sentDetected": "Gesendet-Ordner erkannt: {folder}",
+    "sentNotFound": "Kein Gesendet-Ordner gefunden. Bitte Namen manuell eintragen.",
+    "formSubmitted": "Formular als eingereicht vermerkt, Frist läuft."
   },
   "auth": {
     "login": "Anmelden",
@@ -129,7 +133,9 @@
     "ofTotal": "von {total}",
     "lastPoll": "Letzter Posteingangs-Abruf",
     "never": "nie",
-    "unmatchedMails": "{count} Mail(s) im Posteingang warten auf Zuordnung"
+    "unmatchedMails": "{count} Mail(s) im Posteingang warten auf Zuordnung",
+    "lastRun": "Letzter Lauf {when}: {sent} gesendet, {inbound} Antworten, {auto} automatisch",
+    "allActivity": "Gesamtes Protokoll"
   },
   "brokers": {
     "title": "Datenbroker",
@@ -243,7 +249,13 @@
     "openPrivacyPage": "Datenschutzseite",
     "checkBroker": "Broker-Eintrag prüfen",
     "brokerHasNewEmail": "Der Broker-Eintrag hat inzwischen eine andere Adresse: {email}. Sie ist unten bereits eingesetzt.",
-    "formOnlyHint": "Dieser Broker akzeptiert Anfragen in der Regel nur über sein Formular:"
+    "formOnlyHint": "Dieser Broker akzeptiert Anfragen in der Regel nur über sein Formular:",
+    "timeline": "Zeitleiste",
+    "formTitle": "Formular des Brokers ausfüllen",
+    "formIntro": "Dieser Broker bearbeitet Anfragen nur über sein Webformular. Öffne das Formular, füge deine Daten ein (Kopieren-Button) und markiere danach „Formular eingereicht“. Dann startet die Frist und Antworten werden überwacht.",
+    "formDataPreview": "Daten für das Formular anzeigen",
+    "formSubmitted": "Formular eingereicht",
+    "formSubmittedAt": "Formular eingereicht am {when}."
   },
   "profile": {
     "title": "Mein Profil",
@@ -298,7 +310,30 @@
     "lastError": "Letzter Fehler",
     "lastPoll": "Letzter Abruf",
     "hint": "Tipp: Verwende eine eigene Adresse wie datenschutz@deinedomain.ch, damit Antworten gesammelt eintreffen. Bei Gmail ein App-Passwort nutzen; bei Proton die Proton Bridge.",
-    "notConfigured": "Noch kein E-Mail-Konto hinterlegt."
+    "notConfigured": "Noch kein E-Mail-Konto hinterlegt.",
+    "sentMailbox": "Ordner für gesendete Mails",
+    "sentMailboxAuto": "automatisch (\\\\Sent)",
+    "sentMailboxHint": "Jede gesendete Anfrage, Erinnerung und Antwort wird zusätzlich per IMAP in diesen Ordner kopiert, damit sie im Mailprogramm unter „Gesendet“ erscheint. Leer lassen für automatische Erkennung.",
+    "detectSent": "Gesendet-Ordner erkennen",
+    "automation": "Automatik",
+    "automationIntro": "Was die App ohne dein Zutun erledigt. Jede automatische Aktion erscheint in der Zeitleiste der Anfrage.",
+    "autoFollowup": "Rückfragen automatisch beantworten",
+    "autoFollowupHint": "Verlangt ein Broker einen Identitätsnachweis oder zusätzliche Angaben (ohne Formularzwang), sendet die App einmalig die passende Antwort-Vorlage im selben Thread.",
+    "autoConfirmLinks": "Bestätigungslinks automatisch öffnen",
+    "autoConfirmLinksHint": "Enthält eine Antwort einen „Bitte bestätigen Sie Ihre Anfrage“-Link, ruft die App ihn serverseitig auf und protokolliert die Antwort der Seite.",
+    "autoResend": "Nach Unzustellbarkeit automatisch neu senden",
+    "autoResendHint": "Kommt eine Mail zurück und der Broker-Eintrag hat inzwischen eine andere Adresse, wird die Anfrage dorthin neu gesendet (max. 2-mal). Ist der Broker auf „Nur Formular“ umgestellt, wird die Anfrage in eine Formular-Aufgabe umgewandelt.",
+    "runStarted": "Lauf",
+    "runTrigger": "Auslöser",
+    "runSent": "Gesendet",
+    "runInbound": "Eingang zugeordnet / offen",
+    "runAuto": "Automatik",
+    "runErrors": "Fehler",
+    "trigger_cron": "Cron",
+    "trigger_manual": "Manuell",
+    "trigger_send": "Versand",
+    "trigger_scheduler": "Zeitplan",
+    "trigger_api": "API"
   },
   "templates": {
     "title": "Vorlagen",
@@ -351,5 +386,42 @@
     "learnHint": "Künftige Mails von dieser Adresse/Domain werden automatisch diesem Broker zugeordnet.",
     "ignore": "Ignorieren",
     "unignore": "Wiederherstellen"
+  },
+  "activity": {
+    "title": "Aktivität",
+    "intro": "Lückenloses Protokoll: jeder Versand, jede Antwort, jede automatische Aktion mit Zeitstempel.",
+    "when": "Zeitpunkt",
+    "event": "Ereignis",
+    "request": "Anfrage",
+    "detail": "Details",
+    "empty": "Noch keine Einträge.",
+    "warnOnly": "Nur Warnungen",
+    "errorOnly": "Nur Fehler"
+  },
+  "events": {
+    "request_drafted": "Anfrage erstellt",
+    "request_queued": "Zum Versand eingereiht",
+    "request_sent": "E-Mail gesendet",
+    "request_failed": "Versand fehlgeschlagen",
+    "request_bounced": "E-Mail unzustellbar",
+    "request_overdue": "Frist abgelaufen",
+    "request_escalation_ready": "Eskalation möglich",
+    "request_status": "Status geändert",
+    "request_edited": "Entwurf bearbeitet",
+    "request_form_only": "Formular-Aufgabe erstellt (Broker akzeptiert keine E-Mail)",
+    "request_form_submitted": "Formular eingereicht",
+    "reminder_sent": "Erinnerung gesendet",
+    "reminder_failed": "Erinnerung fehlgeschlagen",
+    "reply_received": "Antwort erhalten",
+    "reply_sent": "Antwort gesendet",
+    "inbox_assigned": "Mail manuell zugeordnet",
+    "action_resolved": "Aktion als erledigt markiert",
+    "imap_failed": "Posteingang-Abruf fehlgeschlagen",
+    "auto_followup": "Automatische Antwort gesendet",
+    "auto_followup_failed": "Automatische Antwort fehlgeschlagen",
+    "auto_confirm": "Bestätigungslink automatisch geöffnet",
+    "auto_confirm_failed": "Bestätigungslink konnte nicht bestätigt werden",
+    "auto_resend": "Automatisch an korrigierte Adresse neu gesendet",
+    "auto_form_fallback": "Automatisch in Formular-Aufgabe umgewandelt"
   }
 }

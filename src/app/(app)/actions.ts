@@ -28,7 +28,7 @@ export async function runWorkerAction(formData: FormData) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const back = String(formData.get("back") || "/dashboard");
-  const r = await runWorker(user.id);
+  const r = await runWorker(user.id, "manual");
   revalidatePath("/", "layout");
   if (r.errors.length) {
     redirectFlash(back, "workerErrors", "err", { errors: r.errors.join("; ").slice(0, 300) });

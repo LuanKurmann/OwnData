@@ -122,7 +122,8 @@ const CLASS_RULES: Array<{ cls: Classification | "rejected_weak"; patterns: RegE
       /(within|in) (the next )?(\d+|one|two|thirty|forty-five) (business |working )?days/i,
       /(haben|ist) (ihre|ihr|die) (anfrage|antrag|nachricht|e-?mail|begehren|ersuchen) erhalten/i,
       /eingang(sbest(ä|ae)tigung)?/i,
-      /vielen dank f(ü|ue)r (ihre|ihr|die) (anfrage|nachricht|e-?mail)/i,
+      /(vielen|besten|herzlichen) dank f(ü|ue)r (ihre|ihr|die) (anfrage|nachricht|e-?mail|mitteilung)/i,
+      /wir (werden|k(ü|ue)mmern) uns (schnellstm(ö|oe)glich|umgehend|zeitnah|so schnell wie m(ö|oe)glich|baldm(ö|oe)glichst)?/i,
       /wird (bearbeitet|gepr(ü|ue)ft|umgehend)/i,
       /in bearbeitung/i,
       /(ticket|case|reference|request) ?(number|id|#|no\.?|nr\.?)/i,
@@ -228,7 +229,7 @@ export function extractLinks(text: string, html?: string | null, max = 10): Extr
     return s;
   };
   return [...found.entries()]
-    .map(([url, label]) => ({ url, label: label || shortUrl(url) }))
+    .map(([url, label]) => ({ url, label: !label || /^https?:\/\//i.test(label) || label.length > 48 ? shortUrl(url) : label }))
     .sort((a, b) => score(b.url, b.label) - score(a.url, a.label))
     .slice(0, max);
 }
@@ -236,9 +237,10 @@ export function extractLinks(text: string, html?: string | null, max = 10): Extr
 function shortUrl(u: string): string {
   try {
     const x = new URL(u);
-    return (x.host + x.pathname).replace(/\/$/, "").slice(0, 60);
+    const s = (x.host.replace(/^www\./, "") + x.pathname).replace(/\/$/, "");
+    return s.length > 44 ? s.slice(0, 41) + "…" : s;
   } catch {
-    return u.slice(0, 60);
+    return u.slice(0, 44);
   }
 }
 

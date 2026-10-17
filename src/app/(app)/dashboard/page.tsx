@@ -11,6 +11,7 @@ import { fmtDateTime } from "@/lib/format";
 import Flash from "@/components/Flash";
 import StatusBadge from "@/components/StatusBadge";
 import SubmitButton from "@/components/SubmitButton";
+import EventLabel from "@/components/EventLabel";
 import { runWorkerAction } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ).filter((r) => !["completed", "rejected", "escalated"].includes(r.req.status) && !(ATTENTION as readonly string[]).includes(r.req.status));
   const unmatched = await unmatchedCount(user.id);
 
+  const lastRun = await db.select().from(schema.workerRuns).where(eq(schema.workerRuns.userId, user.id)).orderBy(desc(schema.workerRuns.startedAt)).get();
   const activity = await db
     .select()
     .from(schema.activityLog)
@@ -137,15 +139,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <h2 className="mb-3 font-semibold">{t("activity")}</h2>
           <p className="mb-2 text-xs text-slate-500">
             {t("lastPoll")}: {mail?.imapLastPollAt ? fmtDateTime(mail.imapLastPollAt, locale) : t("never")}
+            {lastRun ? <> · {t("lastRun", { when: fmtDateTime(lastRun.startedAt, locale), sent: lastRun.sent, inbound: lastRun.inboundMatched, auto: lastRun.autoActions })}</> : null}
+            {" · "}<Link href="/activity" className="underline">{t("allActivity")}</Link>
           </p>
           {activity.length === 0 ? (
             <p className="text-sm text-slate-500">{t("noActivity")}</p>
           ) : (
             <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
               {activity.map((a) => (
-                <li key={a.id} className="py-1.5">
+                <li key={a.id} className="break-anywhere py-1.5">
                   <span className="text-xs text-slate-400">{fmtDateTime(a.createdAt, locale)}</span>{" "}
-                  <span className={a.level === "error" ? "text-red-600" : a.level === "warn" ? "text-amber-600" : ""}>{a.event}</span>
+                  <span className={a.level === "error" ? "text-red-600" : a.level === "warn" ? "text-amber-600" : ""}><EventLabel event={a.event} /></span>
                   {a.detail ? <span className="text-slate-500"> · {a.detail.slice(0, 80)}</span> : null}
                   {a.requestId ? (
                     <Link href={`/requests/${a.requestId}`} className="ml-1 text-brand-600 underline">#{a.requestId}</Link>

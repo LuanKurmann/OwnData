@@ -14,7 +14,10 @@ Rechtsgrundlagen: **Schweizer DSG** (Art. 25, 30, 32), **EU-DSGVO** (Art. 15, 17
 - **Posteingang**: Alle Antworten werden per IMAP eingelesen und zugeordnet (Threading-Header, Referenz, gelernte Absenderregeln, Absenderdomain, Broker-Name bei Ticketsystemen wie Zendesk oder OneTrust). Nicht zuordenbare Mails landen im Posteingang und werden per Klick zugeordnet; die App merkt sich den Absender.
 - **Einstufung und nächste Schritte**: Antworten werden regelbasiert eingestuft (Eingang bestätigt, erledigt, abgelehnt, Rückfrage, Aktion nötig, unzustellbar). Links aus der Antwort erscheinen als Buttons, verlangte Aktionen als Checkliste. Unzustellbare Mails setzen die Anfrage auf „Unzustellbar“ und zeigen die korrigierte Adresse oder das Formular des Brokers.
 - **Antworten aus der App**: Antwort-Editor im Thread mit Vorlagen (Identität ohne Ausweiskopie, Angaben nachliefern, Anfrage bestätigen, Stand nachfragen), Versand im selben Mail-Thread.
-- **Nur-Formular-Broker**: Einträge, die E-Mail-Anfragen nicht bearbeiten (z.B. FastPeopleSearch, Kaspr, LiveRamp, Oracle), sind markiert und verlinken direkt auf ihr Formular.
+- **Nur-Formular-Broker**: Einträge, die E-Mail-Anfragen nicht bearbeiten (z.B. FastPeopleSearch, Kaspr, LiveRamp, Oracle), erzeugen keine Mail, sondern eine Formular-Aufgabe mit Link, kopierbaren Profildaten und „Formular eingereicht“-Knopf, der die Frist startet.
+- **Automatik** (pro Konto abschaltbar): Rückfragen nach Identitätsnachweis oder Angaben werden einmalig mit der passenden Vorlage beantwortet; „Bitte bestätigen Sie Ihre Anfrage“-Links werden serverseitig geöffnet und das Ergebnis protokolliert; nach einem Bounce wird an die inzwischen korrigierte Broker-Adresse neu gesendet oder in eine Formular-Aufgabe umgewandelt.
+- **Nachvollziehbar**: Jede Anfrage hat eine Zeitleiste (erstellt, gesendet mit Message-ID, Antwort, Erinnerung, automatische Aktionen, Fehler). Die Seite „Aktivität“ zeigt das Gesamtprotokoll, die Mail-Einstellungen die letzten Worker-Läufe mit Auslöser und Zählern.
+- **Gesendet-Ordner**: Jede gesendete Anfrage, Erinnerung und Antwort wird per IMAP in den Ordner „Gesendet“ des Postfachs kopiert (automatisch erkannt über `\Sent`, manuell einstellbar).
 - **Fristen und Eskalation**: 30 Tage (DSG/DSGVO) bzw. 45/15 Tage (CCPA). Nach Ablauf automatische Erinnerung, 14 Tage später Status „Eskalation möglich“ mit fertigem Beschwerdetext (EDÖB, EU-Aufsichtsbehörde, CPPA).
 - **Mehrnutzerfähig**: Login mit E-Mail und Passwort, erster Nutzer ist Admin, Registrierung per `ALLOW_REGISTRATION` steuerbar. Jeder Nutzer hat eigenes Profil, Mailkonto, eigene Broker und Vorlagen.
 - **Zwei Betriebsarten**: Docker-Container mit lokaler SQLite-Datei, oder Vercel (Hobby, gratis) mit Turso als gehosteter libSQL-Datenbank.
@@ -83,7 +86,9 @@ cp .env.example .env   # APP_SECRET setzen
 npm run dev            # http://localhost:3000
 ```
 
-Nützliche Befehle: `npm run typecheck`, `npm run lint`, `npm run build`, `npm run db:generate` (neue Migration nach Schemaänderung).
+Nützliche Befehle: `npm run typecheck`, `npm run lint`, `npm test` (Unit-Tests für Einstufung, Bounce-Parsing, Zuordnung, Adressen), `npm run build`, `npm run db:generate` (neue Migration nach Schemaänderung).
+
+Getestet wird zusätzlich End-to-End mit Playwright gegen einen lokalen SMTP-Sink und einen Dovecot-IMAP-Server, in den echte Broker-Antworten als `.eml` eingespielt werden (Bounces, Ticketsystem-Antworten, Formularverweise, Bestätigungslinks).
 
 ## Konfiguration
 

@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db";
 import type { Broker, ProfileWithAddresses, Template, RequestType, Jurisdiction } from "@/db/schema";
 import { newReference } from "@/lib/reference";
 import { buildVars, render } from "@/lib/template-render";
+import { addFormAction } from "./inbox";
 
 /** Resolve a template: user override first, then system template. */
 export async function resolveTemplate(userId: number, key: string): Promise<Template | null> {
@@ -94,7 +95,8 @@ export async function createRequests(input: CreateRequestInput): Promise<{ creat
 
   for (const broker of brokersList) {
     const toEmail = (input.toEmailOverride || broker.privacyEmail).trim();
-    if (!toEmail) {
+    const formOnly = broker.preferredChannel === "form" && !!broker.optOutUrl && !input.toEmailOverride;
+    if (!toEmail && !formOnly) {
       skipped.push({ brokerId: broker.id, reason: "noEmail" });
       continue;
     }
@@ -105,6 +107,31 @@ export async function createRequests(input: CreateRequestInput): Promise<{ creat
       continue;
     }
     const reference = newReference();
+    if (formOnly) {
+      // No e-mail: the broker only processes web-form requests. Create the request as an open action with the form link.
+      const vars = buildVars({ profile, broker, reference, lang: tpl.language, requestType: input.type, jurisdiction: broker.jurisdiction, senderEmail });
+      const row = await db
+        .insert(schema.requests)
+        .values({
+          userId: input.userId,
+          brokerId: broker.id,
+          reference,
+          type: input.type,
+          jurisdiction: broker.jurisdiction,
+          language: tpl.language,
+          status: "action_required",
+          toEmail: toEmail || "",
+          subject: render(tpl.subject, vars),
+          body: render(tpl.body, vars),
+          notes: "",
+        })
+        .returning({ id: schema.requests.id })
+        .get();
+      await addFormAction(input.userId, row.id, broker);
+      await db.insert(schema.activityLog).values({ userId: input.userId, requestId: row.id, event: "request.form_only", detail: broker.optOutUrl }).run();
+      created.push(row.id);
+      continue;
+    }
     const vars = buildVars({
       profile,
       broker,

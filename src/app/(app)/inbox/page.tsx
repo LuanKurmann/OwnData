@@ -88,8 +88,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
               <li key={m.id} className="card">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{m.subject || "(ohne Betreff)"}</div>
-                    <div className="truncate text-xs text-slate-500">
+                    <div className="break-anywhere font-medium">{m.subject || "(ohne Betreff)"}</div>
+                    <div className="break-anywhere text-xs text-slate-500">
                       {m.fromName ? `${m.fromName} · ` : ""}
                       <span className="font-mono">{m.fromAddr}</span> · {fmtDateTime(m.receivedAt, locale)}
                     </div>
@@ -115,8 +115,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                 {links.length ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {links.slice(0, 5).map((l) => (
-                      <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary px-2 py-1 text-xs" title={l.url}>
-                        <ExternalLink className="h-3 w-3" /> {l.label}
+                      <a key={l.url} href={l.url} target="_blank" rel="noreferrer noopener" className="btn-secondary max-w-full px-2 py-1 text-xs" title={l.url}>
+                        <ExternalLink className="h-3 w-3 shrink-0" /> <span className="truncate">{l.label}</span>
                       </a>
                     ))}
                   </div>

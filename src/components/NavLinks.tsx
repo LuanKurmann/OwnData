@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, Send, UserRound, Mail, FileText, Inbox } from "lucide-react";
+import { LayoutDashboard, Building2, Send, UserRound, Mail, FileText, Inbox, History } from "lucide-react";
 
-const ICONS = { dashboard: LayoutDashboard, brokers: Building2, requests: Send, inbox: Inbox, profile: UserRound, mail: Mail, templates: FileText };
+const ICONS = { dashboard: LayoutDashboard, brokers: Building2, requests: Send, inbox: Inbox, activity: History, profile: UserRound, mail: Mail, templates: FileText };
 
 export type NavItem = { key: keyof typeof ICONS; href: string; label: string; badge?: number };
 

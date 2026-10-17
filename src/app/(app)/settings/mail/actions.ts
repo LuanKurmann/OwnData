@@ -8,7 +8,7 @@ import { encrypt } from "@/lib/crypto";
 import { redirectFlash } from "@/lib/flash";
 import { getMailAccount } from "@/server/requests";
 import { verifySmtp } from "@/server/mail/smtp";
-import { verifyImap } from "@/server/mail/imap";
+import { detectSentMailbox, verifyImap } from "@/server/mail/imap";
 
 const PATH = "/settings/mail";
 
@@ -27,6 +27,10 @@ const mailSchema = z.object({
   imapUser: z.string().default(""),
   imapPass: z.string().default(""),
   imapMailbox: z.string().default("INBOX"),
+  imapSentMailbox: z.string().default(""),
+  autoFollowup: z.string().optional(),
+  autoConfirmLinks: z.string().optional(),
+  autoResend: z.string().optional(),
 });
 
 export async function saveMailAction(formData: FormData) {
@@ -52,6 +56,10 @@ export async function saveMailAction(formData: FormData) {
     imapUser: d.imapUser,
     imapPassEnc: d.imapPass ? encrypt(d.imapPass) : existing?.imapPassEnc ?? "",
     imapMailbox: d.imapMailbox || "INBOX",
+    imapSentMailbox: d.imapSentMailbox.trim(),
+    autoFollowup: d.autoFollowup === "on",
+    autoConfirmLinks: d.autoConfirmLinks === "on",
+    autoResend: d.autoResend === "on",
     updatedAt: new Date(),
   };
   if (existing) {
@@ -80,6 +88,22 @@ export async function testSmtpAction() {
     redirectFlash(PATH, "smtpFail", "err", { error: msg.slice(0, 200) });
   }
   redirectFlash(PATH, "smtpOk");
+}
+
+export async function detectSentAction() {
+  const user = await requireUser();
+  const acc = await getMailAccount(user.id);
+  if (!acc) redirectFlash(PATH, "noMail", "err");
+  let folder: string | null = null;
+  try {
+    folder = await detectSentMailbox(acc);
+  } catch (e) {
+    redirectFlash(PATH, "imapFail", "err", { error: (e instanceof Error ? e.message : String(e)).slice(0, 200) });
+  }
+  if (!folder) redirectFlash(PATH, "sentNotFound", "err");
+  await (await getDb()).update(schema.mailAccounts).set({ imapSentMailbox: folder }).where(eq(schema.mailAccounts.id, acc.id)).run();
+  revalidatePath(PATH);
+  redirectFlash(PATH, "sentDetected", "ok", { folder });
 }
 
 export async function testImapAction() {

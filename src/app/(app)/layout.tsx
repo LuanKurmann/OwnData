@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { key: "brokers", href: "/brokers", label: t("brokers") },
     { key: "requests", href: "/requests", label: t("requests") },
     { key: "inbox", href: "/inbox", label: t("inbox"), badge: open },
+    { key: "activity", href: "/activity", label: t("activity") },
     { key: "profile", href: "/profile", label: t("profile") },
     { key: "mail", href: "/settings/mail", label: t("mail") },
     { key: "templates", href: "/templates", label: t("templates") },
@@ -44,8 +45,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </aside>
-      <main className="flex-1 p-4 md:p-8">
-        <div className="mx-auto max-w-6xl">{children}</div>
+      <main className="min-w-0 flex-1 p-4 md:p-8">
+        <div className="mx-auto min-w-0 max-w-6xl">{children}</div>
       </main>
     </div>
   );
